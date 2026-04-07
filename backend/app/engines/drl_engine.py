@@ -82,17 +82,31 @@ class DRLEngine(BaseEngine):
 
         emit(f"[{self.name}] Training PPO setup completed...")
 
-        # PPO 训练
-        model = PPO(
-            "MlpPolicy",
-            train_env,
-            learning_rate=config.drl_learning_rate,
-            gamma=config.drl_gamma,
-            seed=config.default_seed,
-            verbose=0,
-        )
+        import os
+        model_path = "ppo_model.zip"
+
+        if os.path.exists(model_path):
+            emit(f"[{self.name}] Existing model found! Loading historical weights for continuous training...")
+            model = PPO.load(model_path, env=train_env)
+            # Updating learning rate etc is possible, but sb3 handles it if continued
+        else:
+            emit(f"[{self.name}] No historical model found. Initializing new PPO weights...")
+            # PPO 训练
+            model = PPO(
+                "MlpPolicy",
+                train_env,
+                learning_rate=config.drl_learning_rate,
+                gamma=config.drl_gamma,
+                seed=config.default_seed,
+                verbose=0,
+            )
+            
         emit(f"[{self.name}] Training PPO on {total_timesteps} timesteps...")
         model.learn(total_timesteps=total_timesteps)
+        
+        # 保存训练好的模型记忆
+        model.save(model_path)
+        emit(f"[{self.name}] Training complete. Model weights saved to {model_path}")
 
         emit(f"[{self.name}] Converging... evaluating agent on validation set")
         # 在验证集上评估
