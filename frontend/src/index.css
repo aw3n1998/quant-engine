@@ -1,0 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #000000;
+    color: #00FF41;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    overflow-x: hidden;
+  }
+}
+
+@layer utilities {
+  .text-shadow-neon {
+    text-shadow: 0 0 10px #00FF41, 0 0 20px #00FF41, 0 0 40px #00FF41;
+  }
+}
+
+/* Base Matrix Button Overrides */
+.matrix-btn {
+  background-color: transparent !important;
+  color: #00FF41 !important;
+  border: 1px solid #00FF41 !important;
+  box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.4);
+  transition: all 0.2s ease-in-out;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+.matrix-btn:hover:not(:disabled) {
+  background-color: #00FF41 !important;
+  color: #000000 !important;
+  box-shadow: 0 0 20px #00FF41;
+}
+.matrix-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Input Fields Overrides */
+input[type="number"], input[type="text"], input[type="date"], select {
+  background-color: #0a110a !important;
+  color: #00FF41 !important;
+  border: 1px solid #008F11 !important;
+  outline: none;
+  font-family: inherit;
+  padding: 4px 8px;
+}
+input[type="number"]:focus, select:focus {
+  border-color: #00FF41 !important;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3) !important;
+}
+
+/* Slider Overrides */
+input[type="range"] {
+  accent-color: #00FF41;
+}
+
+/* Custom Scrollbar for Hacker Aesthetic */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+  border-left: 1px solid #008F11;
+}
+::-webkit-scrollbar-thumb {
+  background: #008F11;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00FF41;
+}
+
+/* 3D Wireframe Magnetic Gravity Field */
+@keyframes wireframe-spin {
+  from { transform: rotateX(70deg) rotateZ(0deg); }
+  to { transform: rotateX(70deg) rotateZ(360deg); }
+}
+
+@keyframes core-pulse {
+  0%, 100% { box-shadow: 0 0 10px #00FF41, 0 0 20px #fff; transform: translate(-50%, -50%) scale(1); }
+  50% { box-shadow: 0 0 20px #C724FF, 0 0 30px #fff; transform: translate(-50%, -50%) scale(1.5); }
+}
+
+.magnetic-field-container {
+  width: 48px;
+  height: 48px;
+  perspective: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.magnetic-field {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: wireframe-spin 8s linear infinite; /* Idle: very slow */
+}
+
+/* 6 Longitude Lines */
+.magnetic-line {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 255, 65, 0.4);
+  box-shadow: inset 0 0 2px rgba(0, 255, 65, 0.1);
+  transition: all 0.5s ease;
+}
+
+.magnetic-line:nth-child(1) { transform: rotateY(0deg); }
+.magnetic-line:nth-child(2) { transform: rotateY(30deg); }
+.magnetic-line:nth-child(3) { transform: rotateY(60deg); }
+.magnetic-line:nth-child(4) { transform: rotateY(90deg); }
+.magnetic-line:nth-child(5) { transform: rotateY(120deg); }
+.magnetic-line:nth-child(6) { transform: rotateY(150deg); }
+
+/* Equator / Accretion Disk Ring */
+.magnetic-equator {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 130%; height: 130%;
+  margin-top: -65%; margin-left: -65%;
+  border-radius: 50%;
+  border: 1px dashed rgba(199, 36, 255, 0.4);
+  transform: rotateX(90deg);
+  box-shadow: 0 0 5px rgba(199, 36, 255, 0.4);
+  transition: all 0.5s ease;
+}
+
+.magnetic-core {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 4px; height: 4px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  transform-style: preserve-3d;
+  animation: core-pulse 3s ease-in-out infinite; /* Idle pulse */
+}
+
+/* =======================================================
+   💥 OVERDRIVE RUNNING STATE 💥
+   ======================================================= */
+.is-running .magnetic-field {
+  animation: wireframe-spin 0.4s linear infinite !important; /* Hyper-spin */
+}
+
+.is-running .magnetic-line {
+  border: 2px solid #00FF41;
+  box-shadow: 0 0 10px #00FF41, inset 0 0 10px #00FF41;
+}
+
+.is-running .magnetic-equator {
+  border: 2px dashed #00FFFF;
+  box-shadow: 0 0 20px #00FFFF, inset 0 0 15px #00FFFF;
+  animation: wireframe-spin 0.2s linear infinite reverse; /* Opposing spin! */
+}
+
+.is-running .magnetic-core {
+  width: 8px; height: 8px;
+  background: #FFF;
+  animation: core-pulse 0.2s ease-in-out infinite !important; /* Furious pulse */
+}
