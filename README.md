@@ -1,4 +1,4 @@
-# Crypto Quant Terminal
+# Quant Terminal
 
 A production-grade, multi-engine extensible full-stack quantitative trading terminal.
 
