@@ -49,6 +49,27 @@ class MEVCaptureStrategy(BaseStrategy):
         mom_period = params["momentum_period"]
         scale = params["position_scale"]
 
+        # ── 降级检测：真实 Binance 数据无链上 MEV 字段时切换为 ATR 波动率突破策略 ──
+        # 用 K 线振幅百分位替代 MEV 百分位，参数含义保持一致，Bayesian/GA 调参无感知
+        if df["onchain_mev_score"].abs().sum() < 1e-10:
+            high_col  = df["high"].rolling(mev_smooth).max()
+            low_col   = df["low"].rolling(mev_smooth).min()
+            atr_proxy = (high_col - low_col) / df["close"].replace(0, np.nan)
+            atr_rank  = atr_proxy.rolling(rank_window).rank(pct=True)
+            momentum  = df["close"].pct_change(mom_period)
+
+            position = pd.Series(0.0, index=df.index)
+            for i in range(rank_window, len(df)):
+                rank_val = atr_rank.iloc[i]
+                mom_val  = momentum.iloc[i]
+                if np.isnan(rank_val) or np.isnan(mom_val):
+                    continue
+                if rank_val > high_pct:
+                    position.iloc[i] = scale if mom_val > 0 else -scale
+
+            daily_return = df["close"].pct_change()
+            return (position.shift(1) * daily_return).fillna(0.0)
+
         mev = df["onchain_mev_score"].rolling(mev_smooth).mean()
 
         # 滚动百分位排名

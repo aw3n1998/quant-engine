@@ -48,6 +48,35 @@ class NLPEventDrivenStrategy(BaseStrategy):
         decay = params["decay_period"]
         vol_ma_w = params["vol_ma_window"]
 
+        # ── 降级检测：真实 Binance 数据无 NLP 情绪字段时切换为成交量异常 + 价格突破策略 ──
+        # 用成交量 Z-score 替代情绪 Z-score，vol_spike_mult / decay 等参数语义不变
+        if df["nlp_sentiment"].abs().sum() < 1e-10:
+            vol_ma  = df["volume"].rolling(vol_ma_w).mean()
+            vol_std = df["volume"].rolling(vol_ma_w).std().replace(0, np.nan)
+            vol_z   = (df["volume"] - vol_ma) / vol_std
+            price_chg = df["close"].pct_change()
+
+            position = pd.Series(0.0, index=df.index)
+            pos = 0.0
+            bars_held = 0
+            for i in range(vol_ma_w, len(df)):
+                vz = vol_z.iloc[i]
+                pc = price_chg.iloc[i]
+                if np.isnan(vz) or np.isnan(pc):
+                    position.iloc[i] = pos
+                    continue
+                bars_held += 1
+                # 成交量突破 delta_threshold 倍标准差时视为事件触发
+                if vz > delta_thresh:
+                    pos = 1.0 if pc > 0 else -1.0
+                    bars_held = 0
+                if bars_held > decay:
+                    pos = 0.0
+                position.iloc[i] = pos
+
+            daily_return = df["close"].pct_change()
+            return (position.shift(1) * daily_return).fillna(0.0)
+
         sentiment = df["nlp_sentiment"]
         sent_ma = sentiment.rolling(sent_w).mean()
         sent_std = sentiment.rolling(sent_w).std().replace(0, np.nan)

@@ -48,6 +48,37 @@ class OrderFlowImbalanceStrategy(BaseStrategy):
         exit_z = params["exit_z"]
         trend_ma = params["trend_ma"]
 
+        # ── 降级检测：真实 Binance 数据无订单簿不平衡字段时切换为价格收益率动量策略 ──
+        # 用价格收益率 Z-score 替代 ob_imbalance Z-score，趋势过滤逻辑完全保留
+        if df["ob_imbalance"].abs().sum() < 1e-10:
+            returns  = df["close"].pct_change()
+            smoothed = returns.rolling(smooth_w).mean()
+            ret_mean = smoothed.rolling(z_window).mean()
+            ret_std  = smoothed.rolling(z_window).std().replace(0, np.nan)
+            z_score  = (smoothed - ret_mean) / ret_std
+
+            sma        = df["close"].rolling(trend_ma).mean()
+            trend_up   = df["close"] > sma
+            trend_down = df["close"] < sma
+
+            position = pd.Series(0.0, index=df.index)
+            pos = 0.0
+            for i in range(max(z_window, trend_ma), len(df)):
+                z = z_score.iloc[i]
+                if np.isnan(z):
+                    position.iloc[i] = pos
+                    continue
+                if z > entry_z and trend_up.iloc[i]:
+                    pos = 1.0
+                elif z < -entry_z and trend_down.iloc[i]:
+                    pos = -1.0
+                elif abs(z) < exit_z:
+                    pos = 0.0
+                position.iloc[i] = pos
+
+            daily_return = df["close"].pct_change()
+            return (position.shift(1) * daily_return).fillna(0.0)
+
         ob = df["ob_imbalance"].rolling(smooth_w).mean()
         ob_mean = ob.rolling(z_window).mean()
         ob_std = ob.rolling(z_window).std().replace(0, np.nan)
