@@ -30,14 +30,14 @@ export default function TerminalSection({
       <button
         type="button"
         onClick={() => collapsible && setOpen(!open)}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-heading uppercase tracking-widest ${titleColor} ${collapsible ? 'cursor-pointer hover:bg-bg-tertiary' : 'cursor-default'} transition-colors`}
+        className={`w-full flex items-center gap-2 px-3 py-2 text-heading uppercase tracking-widest ${titleColor} ${collapsible ? 'cursor-pointer hover:bg-bg-tertiary' : 'cursor-default'} transition-colors focus:outline-none overflow-hidden`}
       >
         {collapsible && (
-          <span className="text-caption transition-transform duration-200" style={{ transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+          <span className="text-caption transition-transform duration-200 flex-shrink-0" style={{ transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>
             ▸
           </span>
         )}
-        <span className="flex-1 text-left truncate">[ {title} ]</span>
+        <span className="text-left flex items-center gap-1" style={{ minWidth: 0 }}>[ {title} ]</span>
       </button>
       {(!collapsible || open) && (
         <div className="px-3 pb-3 pt-1 animate-fade-in">

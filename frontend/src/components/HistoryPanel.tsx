@@ -54,9 +54,16 @@ export default function HistoryPanel({ refreshKey = 0 }: Props) {
   const handleValidate = async (run_id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      setLoading(true);
       await validateParams(run_id);
+      // 验证完成后刷新历史列表
+      setTimeout(() => {
+        load();
+        setLoading(false);
+      }, 500);
     } catch (err) {
       console.error('OOS 验证失败:', err);
+      setLoading(false);
     }
   };
 

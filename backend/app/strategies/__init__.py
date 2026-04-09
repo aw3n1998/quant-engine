@@ -18,3 +18,8 @@ from app.strategies import bollinger_squeeze      # noqa: F401
 from app.strategies import ema_trend_filter       # noqa: F401
 from app.strategies import rsi_momentum           # noqa: F401
 from app.strategies import volume_price_momentum  # noqa: F401
+
+# 高级策略（自适应 / ML / 价格行为）
+from app.strategies import regime_meta            # noqa: F401
+from app.strategies import ml_feature_strategy    # noqa: F401
+from app.strategies import price_action_sr        # noqa: F401

@@ -68,14 +68,12 @@ export default function Dashboard() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
         {/* Sidebar — ControlPanel */}
-        {sidebarOpen && (
-          <aside className="w-[320px] shrink-0 border-r border-border-base overflow-y-auto p-4 flex flex-col gap-4">
-            <h2 className="text-heading uppercase tracking-widest border-b border-border-base pb-2">
-              TERMINAL CONSOLE
-            </h2>
-            <ControlPanel connected={connected} runStatus={runStatus} />
-          </aside>
-        )}
+        <aside className={`w-[320px] shrink-0 border-r border-border-base overflow-y-auto p-4 flex flex-col gap-4 ${sidebarOpen ? '' : 'hidden'}`}>
+          <h2 className="text-heading uppercase tracking-widest border-b border-border-base pb-2">
+            TERMINAL CONSOLE
+          </h2>
+          <ControlPanel connected={connected} runStatus={runStatus} />
+        </aside>
 
         {/* Main area */}
         <main className="flex-1 min-w-0 flex flex-col p-4 gap-4 overflow-y-auto">

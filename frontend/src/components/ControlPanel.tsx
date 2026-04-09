@@ -12,9 +12,11 @@ const STRATEGY_OPTIONS = [
   "fibonacci_resonance", "mad_trend", "po3_institutional",
   "orderflow_imbalance", "mev_capture", "nlp_event_driven",
   "liquidation_hunting",
-  // 新增纯K线高回报策略
+  // 纯K线高回报策略
   "donchian_breakout", "bollinger_squeeze", "ema_trend_filter",
   "rsi_momentum", "volume_price_momentum",
+  // 高级策略（自适应 / ML / 价格行为）
+  "regime_meta", "ml_feature_sr", "price_action_sr",
 ];
 
 const TIMEFRAMES = [
@@ -168,7 +170,7 @@ export default function ControlPanel({ connected, runStatus }: Props) {
 
       {/* Engine A: DRL */}
       <TerminalSection
-        title={<span className="flex items-center gap-2">ENGINE A: DRL PIPELINE <span className="text-[10px] px-1 border border-accent-amber text-accent-amber">推荐新手</span></span>}
+        title={<span className="flex items-center gap-1">ENGINE A: DRL <span className="text-[9px] px-1 py-0.5 border border-accent-amber text-accent-amber leading-none">推荐</span></span>}
         accent="magenta" collapsible defaultOpen={false}
       >
         <div className="text-caption text-text-muted mb-2">深度强化学习 — AI 自主学习最优仓位，适合新手，无需调参</div>
@@ -242,6 +244,61 @@ export default function ControlPanel({ connected, runStatus }: Props) {
         <GlowButton fullWidth onClick={() => handleRun("genetic", gaStrategies)}
           disabled={running || !connected || gaStrategies.length === 0} loading={running}>
           [EVOLVE OPTIMAL FACTORS]
+        </GlowButton>
+      </TerminalSection>
+
+      {/* Engine D: Bandit */}
+      <TerminalSection title="ENGINE D: BANDIT" accent="cyan" collapsible defaultOpen={false}>
+        <div className="text-caption text-text-muted mb-2">Thompson Sampling — 在线学习，每根K线实时更新策略权重，自动平衡探索与利用</div>
+        <GlowButton fullWidth onClick={() => handleRun("bandit", STRATEGY_OPTIONS)} disabled={running || !connected} loading={running}>
+          [EXPLORE &amp; EXPLOIT]
+        </GlowButton>
+      </TerminalSection>
+
+      {/* Engine E: Volatility */}
+      <TerminalSection title="ENGINE E: VOLATILITY" accent="emerald" collapsible defaultOpen={false}>
+        <div className="text-caption text-text-muted mb-2">波动率自适应 — 按市场波动率分3档，高波动切防御权重，低波动切高收益权重</div>
+        <GlowButton fullWidth onClick={() => handleRun("volatility", STRATEGY_OPTIONS)} disabled={running || !connected} loading={running}>
+          [ADAPT TO VOLATILITY]
+        </GlowButton>
+      </TerminalSection>
+
+      {/* Engine F: Ensemble */}
+      <TerminalSection title="ENGINE F: ENSEMBLE" accent="magenta" collapsible defaultOpen={false}>
+        <div className="text-caption text-text-muted mb-2">集成学习 — 各子策略独立 Bayesian 优化，IS Sharpe 作为专家权重，加权信号融合</div>
+        <div className="flex flex-col gap-2">
+          <div className="text-caption text-text-secondary mb-1">Target Strategies</div>
+          <div className="max-h-28 overflow-y-auto border border-border-dim p-2 flex flex-col gap-1">
+            {STRATEGY_OPTIONS.map(s => (
+              <label key={s} className="flex items-center gap-2 cursor-pointer text-caption hover:text-text-primary transition-colors"
+                title={STRATEGY_META[s]?.desc}>
+                <input type="checkbox" checked={gaStrategies.includes(s)}
+                  onChange={e => toggleStrategy(gaStrategies, setGaStrategies, s, e.target.checked)}
+                  className="accent-accent-emerald" />
+                <span>{STRATEGY_META[s]?.name ?? s}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <GlowButton fullWidth onClick={() => handleRun("ensemble", gaStrategies)}
+          disabled={running || !connected || gaStrategies.length === 0} loading={running}>
+          [FUSE EXPERT SIGNALS]
+        </GlowButton>
+      </TerminalSection>
+
+      {/* Engine G: Monte Carlo */}
+      <TerminalSection title="ENGINE G: MONTE CARLO" accent="cyan" collapsible defaultOpen={false}>
+        <div className="text-caption text-text-muted mb-2">蒙特卡洛鲁棒性 — 参数扰动 N 次采样，报告 Sharpe 分布 P5/中位数，识别过拟合风险</div>
+        <GlowButton fullWidth onClick={() => handleRun("montecarlo", STRATEGY_OPTIONS)} disabled={running || !connected} loading={running}>
+          [TEST ROBUSTNESS]
+        </GlowButton>
+      </TerminalSection>
+
+      {/* Engine H: Risk Parity */}
+      <TerminalSection title="ENGINE H: RISK PARITY" accent="emerald" collapsible defaultOpen={false}>
+        <div className="text-caption text-text-muted mb-2">风险平价 — 按策略信号波动率倒数分配权重，高波动策略自动降权，追求等风险贡献</div>
+        <GlowButton fullWidth onClick={() => handleRun("risk_parity", STRATEGY_OPTIONS)} disabled={running || !connected} loading={running}>
+          [BALANCE RISK]
         </GlowButton>
       </TerminalSection>
     </div>

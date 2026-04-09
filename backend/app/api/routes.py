@@ -510,8 +510,8 @@ async def _run_in_background(
     })
 
     try:
-        # DRL 和 GA 引擎都接收策略列表（多策略融合）
-        if engine_id in ("drl", "genetic"):
+        # 多策略融合引擎（接收策略列表）
+        if engine_id in ("drl", "genetic", "bandit", "volatility", "ensemble", "montecarlo", "risk_parity"):
             strategies = [STRATEGY_REGISTRY[sid] for sid in strategy_ids]
             await manager.send_log(
                 "info",
