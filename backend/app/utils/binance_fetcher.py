@@ -60,7 +60,7 @@ async def fetch_ohlcv_paginated(
     except ImportError:
         raise RuntimeError("ccxt 未安装，请运行: pip install ccxt")
 
-    # 从环境变量中读取代理配置，解决国内访问限制
+    # 从环境变量中读取代理配置
     import os
     proxy_url = os.getenv("all_proxy") or os.getenv("https_proxy") or os.getenv("http_proxy")
 
@@ -68,19 +68,20 @@ async def fetch_ohlcv_paginated(
         "enableRateLimit": True,
         "options": {"defaultType": "spot"},
     }
-    
-    # 强制将 socks5 转换为 http 格式（ccxt/aiohttp 对 http 代理支持更佳）
+
     if proxy_url:
-        # 如果是 socks5://127.0.0.1:7897，转换为 http 形式供 ccxt 使用
+        # 对于 ccxt.async_support，应使用 'proxy' 键而非 'proxies' 字典
+        # 且国内环境建议使用 http 协议前缀（Clash/V2Ray等通常在同一端口支持 http/socks5）
         if "socks5" in proxy_url:
             proxy_url = proxy_url.replace("socks5://", "http://")
-        config["proxies"] = {
-            "http": proxy_url,
-            "https": proxy_url,
-        }
-        logger.info(f"使用代理拉取数据: {proxy_url}")
+        
+        config["proxy"] = proxy_url
+        logger.info(f"正在通过代理拉取币安数据 (ccxt async): {proxy_url}")
+    else:
+        logger.warning("未检测到代理环境变量 (all_proxy/https_proxy)，国内访问可能失败")
 
     exchange = ccxt.binance(config)
+
 
     all_ohlcv: list = []
 
