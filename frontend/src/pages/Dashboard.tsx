@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import ControlPanel from '../components/ControlPanel';
 import PerformanceArena from '../components/PerformanceArena';
 import Singularity from '../components/Singularity';
 import HistoryPanel from '../components/HistoryPanel';
 import TabBar from '../components/ui/TabBar';
+import HelpModal from '../components/ui/HelpModal';
 
 const MAIN_TABS = [
   { id: 'results',  label: 'RESULTS'  },
@@ -15,11 +16,20 @@ const MAIN_TABS = [
 export default function Dashboard() {
   const {
     connected, logs, results, progressPlots,
-    runStatus, factorWeights, clearLogs, clearResults,
+    runStatus, factorWeights, degradationWarnings, clearLogs, clearResults,
   } = useWebSocket();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mainTab, setMainTab]         = useState('results');
+  const [sidebarOpen, setSidebarOpen]       = useState(true);
+  const [mainTab, setMainTab]               = useState('results');
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [showHelp, setShowHelp]             = useState(false);
+
+  // 引擎跑完自动刷新历史记录
+  useEffect(() => {
+    if (runStatus === 'complete') {
+      setHistoryRefreshKey(k => k + 1);
+    }
+  }, [runStatus]);
 
   const singularityStatus: 'idle' | 'running' | 'done' | 'error' =
     !connected          ? 'error'   :
@@ -31,6 +41,7 @@ export default function Dashboard() {
 
   return (
     <div className="w-full min-h-screen bg-bg-primary flex flex-col">
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {/* ── Header ── */}
       <header className="border-b border-border-base px-4 py-1 flex items-center justify-between shrink-0">
         <Singularity status={singularityStatus} recentLog={recentLog} />
@@ -38,6 +49,12 @@ export default function Dashboard() {
           <span className={`text-caption uppercase tracking-widest ${connected ? 'text-accent-emerald' : 'text-accent-magenta'}`}>
             {connected ? '● LINKED' : '○ OFFLINE'}
           </span>
+          <button
+            onClick={() => setShowHelp(true)}
+            className="text-caption text-accent-cyan hover:text-text-primary border border-accent-cyan/40 px-2 py-1 transition-colors"
+          >
+            [? 新手指南]
+          </button>
           <button
             onClick={() => setSidebarOpen(o => !o)}
             className="text-caption text-text-muted hover:text-text-secondary border border-border-dim px-2 py-1 transition-colors"
@@ -62,7 +79,35 @@ export default function Dashboard() {
 
         {/* Main area */}
         <main className="flex-1 min-w-0 flex flex-col p-4 gap-4 overflow-y-auto">
+          {/* 降级策略警告 banner */}
+          {degradationWarnings.length > 0 && (
+            <div className="border border-accent-amber/60 bg-accent-amber/5 p-3 flex flex-col gap-1">
+              <div className="text-caption text-accent-amber uppercase tracking-widest mb-1">
+                [!] STRATEGY DEGRADATION NOTICE
+              </div>
+              {degradationWarnings.map((w, i) => (
+                <div key={i} className="text-caption text-text-secondary font-mono">&gt; {w}</div>
+              ))}
+            </div>
+          )}
+
           <TabBar tabs={MAIN_TABS} active={mainTab} onChange={setMainTab} />
+
+          {/* 新手引导横幅 — 仅在 idle 且无结果时显示 */}
+          {results.length === 0 && runStatus === 'idle' && (
+            <div className="border border-accent-cyan/30 bg-accent-cyan/5 p-3 flex gap-6 text-caption">
+              {[
+                { step: '① 选数据', desc: '侧边栏 DATA SOURCE 选择数据来源' },
+                { step: '② 运行引擎', desc: '展开 ENGINE A（推荐），点击运行' },
+                { step: '③ 查看结果', desc: '完成后在此 RESULTS 页查看指标' },
+              ].map(item => (
+                <div key={item.step} className="flex gap-2">
+                  <span className="text-accent-amber font-mono shrink-0">{item.step}</span>
+                  <span className="text-text-muted">{item.desc}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {mainTab === 'results' && (
             <PerformanceArena
@@ -74,7 +119,7 @@ export default function Dashboard() {
             />
           )}
 
-          {mainTab === 'history' && <HistoryPanel />}
+          {mainTab === 'history' && <HistoryPanel refreshKey={historyRefreshKey} />}
 
           {mainTab === 'logs' && (
             <div className="border border-border-base bg-bg-secondary p-4 overflow-y-auto flex-1">

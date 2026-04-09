@@ -8,6 +8,7 @@ export function useWebSocket() {
   const [progressPlots, setProgressPlots] = useState<{ step: number; reward: number; entropy: number }[]>([]);
   const [runStatus, setRunStatus] = useState<RunStatus>('idle');
   const [factorWeights, setFactorWeights] = useState<Record<string, number> | null>(null);
+  const [degradationWarnings, setDegradationWarnings] = useState<string[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -48,6 +49,9 @@ export function useWebSocket() {
 
         } else if (msg.type === 'factor_weights') {
           setFactorWeights(msg.data);
+
+        } else if (msg.type === 'degradation_warning') {
+          setDegradationWarnings(msg.strategies as string[]);
         }
 
       } catch (err) {
@@ -74,7 +78,8 @@ export function useWebSocket() {
     setProgressPlots([]);
     setFactorWeights(null);
     setRunStatus('idle');
+    setDegradationWarnings([]);
   }, []);
 
-  return { connected, logs, results, progressPlots, runStatus, factorWeights, clearLogs, clearResults };
+  return { connected, logs, results, progressPlots, runStatus, factorWeights, degradationWarnings, clearLogs, clearResults };
 }

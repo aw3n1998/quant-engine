@@ -4,10 +4,10 @@ interface SingularityProps {
 }
 
 const STATUS_TEXTS: Record<string, string> = {
-  idle: '> [SYS] SYSTEM STANDBY _',
-  running: '> [SYS] OPTIMIZING...',
-  done: '> [SYS] CONVERGENCE ACHIEVED',
-  error: '> [ERR] ANOMALY DETECTED',
+  idle: '> [SYS] 系统待机 | 等待指令',
+  running: '> [SYS] 引擎运行中 | AI 计算进行中...',
+  done: '> [SYS] 运算完成 | 查看右侧结果',
+  error: '> [ERR] 连接断开 | 请检查后端服务',
 };
 
 const STATUS_COLORS: Record<string, string> = {

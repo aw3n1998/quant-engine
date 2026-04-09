@@ -96,7 +96,8 @@ def calmar_ratio(returns: pd.Series, timeframe: str = "1d") -> float:
     ar = annual_return(returns, timeframe=timeframe)
     mdd = max_drawdown(returns)
     if mdd == 0:
-        return 0.0
+        # 零回撤 = 完美策略，直接返回年化收益本身（避免÷0且不惩罚完美结果）
+        return float(ar) if ar > 0 else 0.0
     return float(ar / mdd)
 
 

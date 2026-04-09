@@ -3,7 +3,11 @@ import Plot from 'react-plotly.js';
 import { fetchHistory, fetchHistoryRun, deleteHistoryRun } from '../services/api';
 import type { RunHistoryItem } from '../types';
 
-export default function HistoryPanel() {
+interface Props {
+  refreshKey?: number;
+}
+
+export default function HistoryPanel({ refreshKey = 0 }: Props) {
   const [history, setHistory] = useState<RunHistoryItem[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedData, setExpandedData] = useState<Record<string, unknown> | null>(null);
@@ -20,7 +24,7 @@ export default function HistoryPanel() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [refreshKey]);
 
   const handleExpand = async (run_id: string) => {
     if (expanded === run_id) {

@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from app.config.config import config
@@ -103,7 +103,10 @@ async def get_config() -> dict[str, Any]:
 
 
 @router.post("/upload-data")
-async def upload_data(file: UploadFile = File(...)) -> dict[str, str]:
+async def upload_data(
+    file: UploadFile = File(...),
+    timeframe: str = Query(default="1d", description="数据时间框架，影响年化因子计算"),
+) -> dict[str, str]:
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(400, "仅支持 CSV 文件")
 
@@ -116,6 +119,9 @@ async def upload_data(file: UploadFile = File(...)) -> dict[str, str]:
         df = pd.read_csv(io.BytesIO(content), parse_dates=True, index_col=0)
     except Exception as e:
         raise HTTPException(400, f"CSV 解析失败: {e}")
+
+    # 列名统一小写 + 去空格（兼容 Open/HIGH/Close 等大小写变体）
+    df.columns = df.columns.str.lower().str.strip()
 
     # 必须列检查
     required = {"open", "high", "low", "close", "volume"}
@@ -132,10 +138,10 @@ async def upload_data(file: UploadFile = File(...)) -> dict[str, str]:
     async with _data_lock:
         _data_store["current"] = df
         _data_store["source"] = "csv"
-        _data_store["timeframe"] = "1d"  # CSV 默认假设日线
+        _data_store["timeframe"] = timeframe  # 使用用户指定的时间框架
 
-    logger.info(f"CSV 上传成功: {len(df)} 行")
-    return {"status": "ok", "rows": str(len(df))}
+    logger.info(f"CSV 上传成功: {len(df)} 行，时间框架: {timeframe}")
+    return {"status": "ok", "rows": str(len(df)), "timeframe": timeframe}
 
 
 @router.post("/fetch-binance")
@@ -285,6 +291,23 @@ async def run_engine(req: RunEngineRequest) -> dict[str, str]:
             "ga_population":   req.ga_population,
             "ga_generations":  req.ga_generations,
         }
+
+        # ── 数据降级检测：通知前端哪些策略将使用 fallback 逻辑 ──────────
+        degraded: list[str] = []
+        if "onchain_mev_score" in df.columns and df["onchain_mev_score"].abs().sum() < 1e-10:
+            if any(sid in req.strategies for sid in ("mev_capture",)):
+                degraded.append("MEV Capture → ATR 波动率突破（无链上数据）")
+        if "nlp_sentiment" in df.columns and df["nlp_sentiment"].abs().sum() < 1e-10:
+            if any(sid in req.strategies for sid in ("nlp_event_driven",)):
+                degraded.append("NLP Event Driven → 成交量异常检测（无情绪数据）")
+        if "ob_imbalance" in df.columns and df["ob_imbalance"].abs().sum() < 1e-10:
+            if any(sid in req.strategies for sid in ("orderflow_imbalance",)):
+                degraded.append("Order Flow Imbalance → 价格动量（无订单簿数据）")
+        if degraded:
+            await manager.broadcast({
+                "type": "degradation_warning",
+                "strategies": degraded,
+            })
 
         asyncio.create_task(
             _run_in_background(req.engine, req.strategies, df, params, data_source)

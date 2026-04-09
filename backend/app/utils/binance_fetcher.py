@@ -60,10 +60,27 @@ async def fetch_ohlcv_paginated(
     except ImportError:
         raise RuntimeError("ccxt 未安装，请运行: pip install ccxt")
 
-    exchange = ccxt.binance({
+    # 从环境变量中读取代理配置，解决国内访问限制
+    import os
+    proxy_url = os.getenv("all_proxy") or os.getenv("https_proxy") or os.getenv("http_proxy")
+
+    config = {
         "enableRateLimit": True,
         "options": {"defaultType": "spot"},
-    })
+    }
+    
+    # 强制将 socks5 转换为 http 格式（ccxt/aiohttp 对 http 代理支持更佳）
+    if proxy_url:
+        # 如果是 socks5://127.0.0.1:7897，转换为 http 形式供 ccxt 使用
+        if "socks5" in proxy_url:
+            proxy_url = proxy_url.replace("socks5://", "http://")
+        config["proxies"] = {
+            "http": proxy_url,
+            "https": proxy_url,
+        }
+        logger.info(f"使用代理拉取数据: {proxy_url}")
+
+    exchange = ccxt.binance(config)
 
     all_ohlcv: list = []
 

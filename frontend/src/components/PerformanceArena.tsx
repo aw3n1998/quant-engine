@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Plot from 'react-plotly.js';
 import TabBar from './ui/TabBar';
+import MetricRating from './ui/MetricRating';
 import { hackerLayout, STRATEGY_COLORS } from '../utils/plotTheme';
 import type { EngineResultData, RunStatus } from '../types';
 
@@ -43,8 +44,9 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
 
   if (results.length === 0) {
     return (
-      <div className="h-[400px] flex items-center justify-center border border-border-dim text-text-muted text-xl tracking-[10px]">
-        AWAITING INSTRUCTIONS ...
+      <div className="h-[400px] flex flex-col items-center justify-center border border-border-dim text-text-muted gap-3">
+        <div className="text-xl tracking-[10px]">AWAITING INSTRUCTIONS ...</div>
+        <div className="text-caption text-text-muted">运行引擎后，结果将显示在这里</div>
       </div>
     );
   }
@@ -67,6 +69,9 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
     tabs.push({ id: 'optimization', label: 'OPTIMIZATION' });
   }
   tabs.push({ id: 'params', label: 'PARAMS' });
+  // 多引擎对比 tab（≥2 个结果时显示）
+  const multiEngine = results.length >= 2 && new Set(results.map(r => r.engine)).size >= 1;
+  if (results.length >= 2) tabs.push({ id: 'compare', label: 'COMPARE' });
 
   const validTab = tabs.some(t => t.id === activeTab) ? activeTab : 'equity';
 
@@ -101,16 +106,17 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
       {/* 核心指标卡 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Annual Return', value: `${(annual_return * 100).toFixed(2)}%`, positive: annual_return >= 0 },
-          { label: 'Calmar Ratio',  value: calmar.toFixed(3),                      positive: calmar >= 1 },
-          { label: 'Max Drawdown', value: `${(max_drawdown * 100).toFixed(2)}%`,   positive: false },
-          { label: 'Sharpe Ratio', value: sharpe.toFixed(3),                       positive: sharpe >= 1 },
+          { label: 'Annual Return', value: `${(annual_return * 100).toFixed(2)}%`, positive: annual_return >= 0, rating: <MetricRating metric="annual" value={annual_return} /> },
+          { label: 'Calmar Ratio',  value: calmar.toFixed(3),                      positive: calmar >= 1,        rating: <MetricRating metric="calmar" value={calmar} /> },
+          { label: 'Max Drawdown', value: `${(max_drawdown * 100).toFixed(2)}%`,   positive: false,              rating: <MetricRating metric="maxdd"  value={max_drawdown} /> },
+          { label: 'Sharpe Ratio', value: sharpe.toFixed(3),                       positive: sharpe >= 1,        rating: <MetricRating metric="sharpe" value={sharpe} /> },
         ].map(m => (
           <div key={m.label} className="border border-border-dim p-4 bg-bg-secondary text-center">
             <div className="text-caption text-text-muted mb-1 uppercase tracking-wider">{m.label}</div>
             <div className={`text-metric font-mono ${m.positive ? 'text-accent-emerald' : 'text-accent-magenta'}`}>
               {m.value}
             </div>
+            <div className="mt-1 flex justify-center">{m.rating}</div>
           </div>
         ))}
       </div>
@@ -274,6 +280,84 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
             <pre className="text-accent-cyan text-caption overflow-auto leading-relaxed">
               {JSON.stringify(best_params, null, 2)}
             </pre>
+          </div>
+        )}
+
+        {/* COMPARE — 多引擎横向对比 */}
+        {validTab === 'compare' && (
+          <div className="flex flex-col gap-6">
+            {/* 对比表格 */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-caption font-mono border-collapse">
+                <thead>
+                  <tr className="border-b border-border-base text-text-muted uppercase tracking-widest text-[10px]">
+                    <th className="text-left py-2 pr-4">Engine</th>
+                    <th className="text-left py-2 pr-4">Strategy</th>
+                    <th className="text-right py-2 pr-4">Annual Ret</th>
+                    <th className="text-right py-2 pr-4">Calmar</th>
+                    <th className="text-right py-2 pr-4">Sharpe</th>
+                    <th className="text-right py-2">Max DD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r, i) => {
+                    const best = results.reduce((a, b) => a.calmar > b.calmar ? a : b);
+                    const isBest = r.calmar === best.calmar;
+                    return (
+                      <tr
+                        key={i}
+                        className={`border-b border-border-dim cursor-pointer transition-colors ${
+                          i === safeIdx ? 'bg-accent-emerald/5' : 'hover:bg-border-dim/30'
+                        }`}
+                        onClick={() => { setResultIdx(i); setActiveTab('equity'); }}
+                      >
+                        <td className="py-2 pr-4 text-accent-cyan">{r.engine}</td>
+                        <td className="py-2 pr-4 text-text-secondary truncate max-w-[120px]">{r.strategy_name}</td>
+                        <td className={`py-2 pr-4 text-right ${r.annual_return >= 0 ? 'text-accent-emerald' : 'text-accent-magenta'}`}>
+                          {(r.annual_return * 100).toFixed(2)}%
+                        </td>
+                        <td className={`py-2 pr-4 text-right font-bold ${isBest ? 'text-accent-amber' : r.calmar >= 1 ? 'text-accent-emerald' : 'text-accent-magenta'}`}>
+                          {r.calmar.toFixed(3)}{isBest ? ' ★' : ''}
+                        </td>
+                        <td className={`py-2 pr-4 text-right ${r.sharpe >= 1 ? 'text-accent-emerald' : 'text-accent-magenta'}`}>
+                          {r.sharpe.toFixed(3)}
+                        </td>
+                        <td className="py-2 text-right text-accent-magenta">
+                          {(r.max_drawdown * 100).toFixed(2)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Calmar / Sharpe 对比条形图 */}
+            <Plot
+              data={[
+                {
+                  x: results.map(r => `[${r.engine}] ${r.strategy_name}`),
+                  y: results.map(r => r.calmar),
+                  type: 'bar', name: 'Calmar',
+                  marker: { color: results.map(r => r.calmar >= 1 ? '#00FF41' : '#C724FF') },
+                },
+                {
+                  x: results.map(r => `[${r.engine}] ${r.strategy_name}`),
+                  y: results.map(r => r.sharpe),
+                  type: 'bar', name: 'Sharpe',
+                  marker: { color: '#00FFFF', opacity: 0.7 },
+                },
+              ]}
+              layout={hackerLayout({
+                title: { text: 'Engine Comparison: Calmar & Sharpe', font: { color: '#00FF41', size: 13 } },
+                barmode: 'group',
+                xaxis: { tickangle: -20, gridcolor: '#122012', color: '#008F11' },
+                yaxis: { gridcolor: '#122012', color: '#00FF41', zeroline: true, zerolinecolor: '#1A3A1A' },
+                margin: { l: 50, r: 20, t: 50, b: 80 },
+              })}
+              useResizeHandler
+              style={{ width: '100%', height: 340 }}
+            />
           </div>
         )}
       </div>

@@ -35,10 +35,10 @@ export async function runEngine(payload: RunRequest): Promise<{ status: string }
   });
 }
 
-export async function uploadData(file: File): Promise<{ status: string; rows: string }> {
+export async function uploadData(file: File, timeframe: string = "1d"): Promise<{ status: string; rows: string; timeframe: string }> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${BASE_URL}/upload-data`, {
+  const res = await fetch(`${BASE_URL}/upload-data?timeframe=${encodeURIComponent(timeframe)}`, {
     method: "POST",
     body: formData,
   });

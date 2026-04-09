@@ -1,6 +1,7 @@
 interface NeonInputProps {
   type?: 'number' | 'text' | 'password' | 'range' | 'select';
   label?: string;
+  tooltip?: string;
   value: string | number;
   onChange: (val: string) => void;
   options?: { value: string; label: string }[];
@@ -12,9 +13,26 @@ interface NeonInputProps {
   className?: string;
 }
 
+function LabelWithTooltip({ label, tooltip }: { label: string; tooltip?: string }) {
+  return (
+    <span className="flex items-center gap-1 text-text-secondary text-caption shrink-0">
+      {label}
+      {tooltip && (
+        <span className="relative group cursor-help">
+          <span className="text-text-muted text-[10px] border border-text-muted rounded-full w-3 h-3 flex items-center justify-center leading-none">?</span>
+          <span className="absolute left-0 bottom-full mb-1 w-52 bg-bg-tertiary border border-border-base text-text-primary text-[10px] p-2 hidden group-hover:block z-50 leading-relaxed pointer-events-none">
+            {tooltip}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function NeonInput({
   type = 'text',
   label,
+  tooltip,
   value,
   onChange,
   options,
@@ -35,7 +53,7 @@ export default function NeonInput({
   if (type === 'select') {
     return (
       <label className={`${wrapperClass} ${className}`}>
-        {label && <span className="text-text-secondary text-caption">{label}</span>}
+        {label && <LabelWithTooltip label={label} tooltip={tooltip} />}
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -51,8 +69,8 @@ export default function NeonInput({
     return (
       <label className={`flex flex-col gap-1 ${className}`}>
         {label && (
-          <span className="text-text-secondary text-caption flex justify-between">
-            <span>{label}</span>
+          <span className="text-caption flex justify-between items-center">
+            <LabelWithTooltip label={label} tooltip={tooltip} />
             <span className="text-text-primary font-mono">{value}{suffix}</span>
           </span>
         )}
@@ -70,7 +88,7 @@ export default function NeonInput({
 
   return (
     <label className={`${wrapperClass} ${className}`}>
-      {label && <span className="text-text-secondary text-caption">{label}</span>}
+      {label && <LabelWithTooltip label={label} tooltip={tooltip} />}
       <input
         type={type}
         value={value}

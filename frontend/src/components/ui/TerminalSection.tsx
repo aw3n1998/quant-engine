@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 interface TerminalSectionProps {
-  title: string;
+  title: ReactNode;
   accent?: 'cyan' | 'magenta' | 'emerald';
   collapsible?: boolean;
   defaultOpen?: boolean;
