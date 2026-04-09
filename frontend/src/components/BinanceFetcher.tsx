@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { fetchBinance } from '../services/api';
-import TerminalSection from './ui/TerminalSection';
 import GlowButton from './ui/GlowButton';
 import NeonInput from './ui/NeonInput';
 
@@ -30,10 +29,20 @@ interface Props {
   onLoaded?: (info: { symbol: string; timeframe: string; rows: number; date_range: string }) => void;
 }
 
+function estimateBars(since: string, until: string, tf: string): number {
+  if (!since || !until) return 0;
+  const ms = new Date(until).getTime() - new Date(since).getTime();
+  const tfMs = TF_HOURS[tf] * 3600 * 1000;
+  return Math.max(0, Math.round(ms / tfMs));
+}
+
 export default function BinanceFetcher({ onLoaded }: Props) {
   const [symbol, setSymbol] = useState('BTC/USDT');
   const [timeframe, setTf] = useState('1h');
   const [limit, setLimit] = useState(2160);
+  const [dateMode, setDateMode] = useState<'recent' | 'range'>('recent');
+  const [sinceDate, setSinceDate] = useState('');
+  const [untilDate, setUntilDate] = useState('');
   const [useMev, setUseMev] = useState(false);
   const [useNlp, setUseNlp] = useState(false);
   const [nlpKey, setNlpKey] = useState('');
@@ -42,14 +51,26 @@ export default function BinanceFetcher({ onLoaded }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const handleTfChange = (tf: string) => { setTf(tf); setLimit(RECOMMENDED[tf] ?? 1000); };
-  const estimatedDays = Math.round((limit * (TF_HOURS[timeframe] || 1)) / 24);
+  const estimatedDays = dateMode === 'recent'
+    ? Math.round((limit * (TF_HOURS[timeframe] || 1)) / 24)
+    : Math.round(estimateBars(sinceDate, untilDate, timeframe) * (TF_HOURS[timeframe] || 1) / 24);
+  const estimatedBarsRange = estimateBars(sinceDate, untilDate, timeframe);
 
   const handleFetch = async () => {
     setLoading(true); setResult(null); setError(null);
     try {
-      const res = await fetchBinance({ symbol, timeframe, limit, use_mev: useMev, use_nlp: useNlp, worldnews_api_key: nlpKey });
+      const payload: Parameters<typeof fetchBinance>[0] = {
+        symbol, timeframe,
+        limit: dateMode === 'recent' ? limit : 99999,
+        use_mev: useMev, use_nlp: useNlp, worldnews_api_key: nlpKey,
+      };
+      if (dateMode === 'range') {
+        if (sinceDate) payload.since_date = sinceDate;
+        if (untilDate) payload.until_date = untilDate;
+      }
+      const res = await fetchBinance(payload);
       const tags = [res.mev_enabled ? 'MEV' : '', res.nlp_enabled ? 'NLP' : ''].filter(Boolean).join('+');
-      setResult(`${res.symbol} ${res.timeframe} x ${res.rows} (${res.date_range})${tags ? ' [' + tags + ']' : ''}`);
+      setResult(`${res.symbol} ${res.timeframe} × ${res.rows} (${res.date_range})${tags ? ' [' + tags + ']' : ''}`);
       onLoaded?.({ symbol: res.symbol, timeframe: res.timeframe, rows: res.rows, date_range: res.date_range });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Fetch failed');
@@ -62,11 +83,63 @@ export default function BinanceFetcher({ onLoaded }: Props) {
         options={SYMBOLS.map(s => ({ value: s, label: s }))} />
       <NeonInput type="select" label="Timeframe" value={timeframe} onChange={handleTfChange} layout="col"
         options={TIMEFRAMES} />
-      <NeonInput type="number" label="K-lines" value={limit} onChange={v => setLimit(Number(v))} min={100} max={100000} step={100} />
 
+      {/* 模式切换 */}
+      <div className="flex gap-2 text-caption">
+        {(['recent', 'range'] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setDateMode(mode)}
+            className={`px-2 py-0.5 border transition-colors ${
+              dateMode === mode
+                ? 'border-accent-cyan text-accent-cyan'
+                : 'border-border-dim text-text-muted hover:border-border-bright'
+            }`}
+          >
+            {mode === 'recent' ? '最近N根' : '日期范围'}
+          </button>
+        ))}
+      </div>
+
+      {/* 最近N根模式 */}
+      {dateMode === 'recent' && (
+        <NeonInput type="number" label="K-lines" value={limit}
+          onChange={v => setLimit(Number(v))} min={100} max={100000} step={100} />
+      )}
+
+      {/* 日期范围模式 */}
+      {dateMode === 'range' && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-caption text-text-secondary shrink-0 w-12">从</span>
+            <input
+              type="date"
+              value={sinceDate}
+              onChange={e => setSinceDate(e.target.value)}
+              className="flex-1 bg-bg-primary border border-border-dim text-text-primary text-caption px-2 py-1 font-mono focus:outline-none focus:border-accent-cyan"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-caption text-text-secondary shrink-0 w-12">到</span>
+            <input
+              type="date"
+              value={untilDate}
+              onChange={e => setUntilDate(e.target.value)}
+              className="flex-1 bg-bg-primary border border-border-dim text-text-primary text-caption px-2 py-1 font-mono focus:outline-none focus:border-accent-cyan"
+            />
+          </div>
+          {sinceDate && untilDate && (
+            <div className="text-caption text-text-muted">
+              估算: <span className="text-text-primary font-mono">{estimatedBarsRange.toLocaleString()}</span> 根
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 覆盖天数估算 */}
       <div className="text-caption text-text-secondary border border-border-dim p-2">
-        Coverage: <span className="text-text-primary font-mono">{estimatedDays}</span> days
-        {timeframe === '5m' && <span className="text-accent-magenta ml-1">(large dataset)</span>}
+        Coverage: <span className="text-text-primary font-mono">{estimatedDays}</span> 天
+        {timeframe === '5m' && <span className="text-accent-magenta ml-1">(大数据集)</span>}
       </div>
 
       {/* MEV */}

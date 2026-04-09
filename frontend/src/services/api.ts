@@ -56,6 +56,8 @@ export async function fetchBinance(payload: {
   use_mev?: boolean;
   use_nlp?: boolean;
   worldnews_api_key?: string;
+  since_date?: string;
+  until_date?: string;
 }): Promise<{
   status: string;
   rows: number;
@@ -66,6 +68,13 @@ export async function fetchBinance(payload: {
   nlp_enabled: boolean;
 }> {
   return request("/fetch-binance", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function validateParams(runId: string): Promise<{ status: string }> {
+  return request<{ status: string }>("/validate", {
+    method: "POST",
+    body: JSON.stringify({ run_id: runId }),
+  });
 }
 
 export async function fetchHistory(limit = 50): Promise<RunHistoryItem[]> {

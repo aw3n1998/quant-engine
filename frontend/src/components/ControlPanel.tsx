@@ -8,10 +8,13 @@ import NeonInput from "./ui/NeonInput";
 import { STRATEGY_META } from "../data/glossary";
 
 const STRATEGY_OPTIONS = [
-  "fibonacci_resonance", "mad_trend", "funding_arbitrage",
-  "po3_institutional", "orderflow_imbalance", "mev_capture",
-  "statistical_pair", "nlp_event_driven", "dynamic_market_making",
-  "liquidation_hunting", "liquidity_hedge_mining", "macro_capital_flow",
+  // 保留策略
+  "fibonacci_resonance", "mad_trend", "po3_institutional",
+  "orderflow_imbalance", "mev_capture", "nlp_event_driven",
+  "liquidation_hunting",
+  // 新增纯K线高回报策略
+  "donchian_breakout", "bollinger_squeeze", "ema_trend_filter",
+  "rsi_momentum", "volume_price_momentum",
 ];
 
 const TIMEFRAMES = [

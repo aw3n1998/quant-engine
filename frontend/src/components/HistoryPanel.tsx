@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Plot from 'react-plotly.js';
-import { fetchHistory, fetchHistoryRun, deleteHistoryRun } from '../services/api';
+import { fetchHistory, fetchHistoryRun, deleteHistoryRun, validateParams } from '../services/api';
 import type { RunHistoryItem } from '../types';
 
 interface Props {
@@ -51,6 +51,15 @@ export default function HistoryPanel({ refreshKey = 0 }: Props) {
     if (expanded === run_id) { setExpanded(null); setExpandedData(null); }
   };
 
+  const handleValidate = async (run_id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await validateParams(run_id);
+    } catch (err) {
+      console.error('OOS 验证失败:', err);
+    }
+  };
+
   if (history.length === 0) return null;
 
   return (
@@ -95,7 +104,14 @@ export default function HistoryPanel({ refreshKey = 0 }: Props) {
                   <td className="py-1 pr-4 text-right text-[#00FFFF]">
                     {row.sharpe?.toFixed(2) ?? '-'}
                   </td>
-                  <td className="py-1">
+                  <td className="py-1 flex items-center gap-1">
+                    {row.engine !== 'drl' && (
+                      <button
+                        onClick={(e) => handleValidate(row.run_id, e)}
+                        title="用当前已加载数据验证此run的参数（样本外验证）"
+                        className="text-[10px] px-1 border border-[#00FFFF]/50 text-[#00FFFF]/70 hover:border-[#00FFFF] hover:text-[#00FFFF] transition-colors"
+                      >OOS</button>
+                    )}
                     <button
                       onClick={(e) => handleDelete(row.run_id, e)}
                       className="text-[#C724FF]/50 hover:text-[#C724FF] px-1"

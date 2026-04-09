@@ -41,6 +41,8 @@ async def fetch_ohlcv_paginated(
     symbol: str,
     timeframe: str,
     total_limit: int = 1000,
+    since_date: str | None = None,
+    until_date: str | None = None,
 ) -> pd.DataFrame:
     """
     分页拉取 Binance OHLCV 数据。
@@ -50,6 +52,8 @@ async def fetch_ohlcv_paginated(
         symbol:      交易对，如 "BTC/USDT"
         timeframe:   时间框架，如 "1h"、"4h"、"1d"
         total_limit: 目标 K 线总数（建议日内: 1h→3000, 4h→1500, 1d→1000）
+        since_date:  起始日期 ISO 格式 "2022-01-01"，指定后 total_limit 自动放大
+        until_date:  截止日期 ISO 格式 "2023-12-31"，拉取后截断
 
     返回:
         pd.DataFrame with columns: open, high, low, close, volume, funding_rate,
@@ -70,18 +74,32 @@ async def fetch_ohlcv_paginated(
     }
 
     if proxy_url:
-        # 对于 ccxt.async_support，应使用 'proxy' 键而非 'proxies' 字典
-        # 且国内环境建议使用 http 协议前缀（Clash/V2Ray等通常在同一端口支持 http/socks5）
+        # 彻底清洗字符串
+        proxy_url = proxy_url.replace("\"", "").replace("'", "").strip()
+        # 转换为 http 协议（aiohttp 对此支持最稳）
         if "socks5" in proxy_url:
-            proxy_url = proxy_url.replace("socks5://", "http://")
+            proxy_url = proxy_url.replace("socks5h://", "http://").replace("socks5://", "http://")
         
-        config["proxy"] = proxy_url
-        logger.info(f"正在通过代理拉取币安数据 (ccxt async): {proxy_url}")
+        # 关键：遵循 ccxt 规则，仅设置 httpsProxy（因为币安是 HTTPS）
+        # 严禁同时设置 httpProxy 和 httpsProxy，否则会报错冲突
+        config["httpsProxy"] = proxy_url
+        logger.info(f"已配置币安 HTTPS 代理: {repr(proxy_url)}")
     else:
-        logger.warning("未检测到代理环境变量 (all_proxy/https_proxy)，国内访问可能失败")
+        logger.warning("未检测到代理环境变量，请确保设置了 $env:all_proxy")
 
     exchange = ccxt.binance(config)
 
+    # 日期范围模式：将 ISO 日期字符串转为毫秒时间戳
+    since_ts_ms: int | None = None
+    until_ts_ms: int | None = None
+    if since_date:
+        since_ts_ms = int(pd.Timestamp(since_date, tz="UTC").timestamp() * 1000)
+        # 日期范围模式：放大 limit 上限，由日期决定数据量
+        total_limit = 100_000
+    if until_date:
+        until_ts_ms = int(pd.Timestamp(until_date, tz="UTC").timestamp() * 1000)
+        # until_date 取当天末尾
+        until_ts_ms += 86_400_000 - 1
 
     all_ohlcv: list = []
 
@@ -91,44 +109,66 @@ async def fetch_ohlcv_paginated(
 
         # 先拉一批以确定最早时间戳
         first_batch = await exchange.fetch_ohlcv(
-            symbol, timeframe, limit=min(BINANCE_MAX_PER_REQUEST, total_limit)
+            symbol, timeframe,
+            since=since_ts_ms,
+            limit=min(BINANCE_MAX_PER_REQUEST, total_limit),
         )
         if not first_batch:
             raise RuntimeError(f"Binance 返回空数据: {symbol} {timeframe}")
 
         all_ohlcv = first_batch
 
-        # 如果需要更多，继续向前拉取
-        while len(all_ohlcv) < total_limit:
-            oldest_ts = all_ohlcv[0][0]
-            # 推算一个间隔（毫秒）以确定向前的 since
-            if len(all_ohlcv) >= 2:
-                interval_ms = all_ohlcv[1][0] - all_ohlcv[0][0]
-            else:
-                interval_ms = _timeframe_to_ms(timeframe)
+        if since_ts_ms is not None:
+            # 日期范围模式：从 since_ts_ms 向后顺序拉取，直到 until_ts_ms 或无更多数据
+            while True:
+                if not all_ohlcv:
+                    break
+                latest_ts = all_ohlcv[-1][0]
+                # 如果已达 until 截止日期，停止
+                if until_ts_ms is not None and latest_ts >= until_ts_ms:
+                    break
+                next_since = latest_ts + _timeframe_to_ms(timeframe)
+                batch = await exchange.fetch_ohlcv(
+                    symbol, timeframe, since=next_since,
+                    limit=BINANCE_MAX_PER_REQUEST,
+                )
+                if not batch:
+                    break
+                all_ohlcv.extend(batch)
+                await asyncio.sleep(0.3)
+        else:
+            # 最近N根模式：向前分批拉取
+            while len(all_ohlcv) < total_limit:
+                oldest_ts = all_ohlcv[0][0]
+                if len(all_ohlcv) >= 2:
+                    interval_ms = all_ohlcv[1][0] - all_ohlcv[0][0]
+                else:
+                    interval_ms = _timeframe_to_ms(timeframe)
 
-            batch_limit = min(BINANCE_MAX_PER_REQUEST, total_limit - len(all_ohlcv))
-            since_ts = oldest_ts - interval_ms * batch_limit
+                batch_limit = min(BINANCE_MAX_PER_REQUEST, total_limit - len(all_ohlcv))
+                since_ts = oldest_ts - interval_ms * batch_limit
 
-            batch = await exchange.fetch_ohlcv(
-                symbol, timeframe, since=since_ts, limit=batch_limit
-            )
-            if not batch:
-                break
+                batch = await exchange.fetch_ohlcv(
+                    symbol, timeframe, since=since_ts, limit=batch_limit
+                )
+                if not batch:
+                    break
 
-            # 只保留时间戳早于当前最早的
-            new_bars = [b for b in batch if b[0] < oldest_ts]
-            if not new_bars:
-                break
+                new_bars = [b for b in batch if b[0] < oldest_ts]
+                if not new_bars:
+                    break
 
-            all_ohlcv = new_bars + all_ohlcv
-            await asyncio.sleep(0.3)  # 遵守 Binance 限速
+                all_ohlcv = new_bars + all_ohlcv
+                await asyncio.sleep(0.3)
 
     finally:
         await exchange.close()
 
-    # 截取最新的 total_limit 根
-    all_ohlcv = all_ohlcv[-total_limit:]
+    # 截取：日期范围模式按 until 截断；最近N根模式取末尾 total_limit 根
+    if until_ts_ms is not None:
+        all_ohlcv = [b for b in all_ohlcv if b[0] <= until_ts_ms]
+    else:
+        all_ohlcv = all_ohlcv[-total_limit:]
 
     df = pd.DataFrame(
         all_ohlcv,

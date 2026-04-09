@@ -74,6 +74,8 @@ class BinanceFetchRequest(BaseModel):
     use_mev: bool = False           # 是否拉取 Flashbots MEV 数据（仅 ETH/USDT 直接相关）
     use_nlp: bool = False           # 是否拉取 WorldNewsAPI 新闻情绪数据
     worldnews_api_key: str = ""     # WorldNewsAPI 密钥（use_nlp=True 时必填）
+    since_date: str | None = None   # 起始日期 "2022-01-01"（指定后按日期范围拉取）
+    until_date: str | None = None   # 截止日期 "2023-12-31"
 
 
 # -----------------------------------------------------------------------
@@ -163,13 +165,19 @@ async def fetch_binance(req: BinanceFetchRequest) -> dict[str, Any]:
     if req.use_nlp and not api_key_to_use:
         raise HTTPException(400, "use_nlp=true 时需提供 worldnews_api_key 或在 .env 中配置")
 
-    await manager.broadcast({
-        "type": "log", "level": "info",
-        "message": f"[Binance] 正在拉取 {req.symbol} {req.timeframe} × {req.limit} 根K线...",
-    })
+    if req.since_date or req.until_date:
+        date_info = f"{req.since_date or '最早'} ~ {req.until_date or '今天'}"
+        log_msg = f"[Binance] 正在拉取 {req.symbol} {req.timeframe} 日期范围 {date_info}..."
+    else:
+        log_msg = f"[Binance] 正在拉取 {req.symbol} {req.timeframe} × {req.limit} 根K线..."
+    await manager.broadcast({"type": "log", "level": "info", "message": log_msg})
 
     try:
-        df = await fetch_ohlcv_paginated(req.symbol, req.timeframe, req.limit)
+        df = await fetch_ohlcv_paginated(
+            req.symbol, req.timeframe, req.limit,
+            since_date=req.since_date,
+            until_date=req.until_date,
+        )
     except Exception as e:
         logger.exception("Binance OHLCV 拉取失败")
         raise HTTPException(502, f"Binance 拉取失败: {e}")
@@ -345,6 +353,131 @@ async def delete_history_run(run_id: str) -> dict[str, str]:
     if not success:
         raise HTTPException(404, f"记录不存在: {run_id}")
     return {"status": "deleted", "run_id": run_id}
+
+
+# -----------------------------------------------------------------------
+# 样本外验证端点（OOS Validation）
+# -----------------------------------------------------------------------
+
+class ValidateRequest(BaseModel):
+    run_id: str   # 要复用参数的历史 run ID
+
+
+@router.post("/validate")
+async def validate_params(req: ValidateRequest) -> dict[str, str]:
+    """
+    将历史 run 的 best_params 直接应用到当前已加载数据，不做任何重新优化。
+    支持 bayesian / genetic 引擎；DRL 因 PPO 权重未持久化，返回 400。
+    结果通过 WebSocket broadcast，格式与普通 run 结果相同（含 validation=True 标记）。
+    """
+    from app.utils.persistence import load_run
+    from app.utils.metrics import compute_all_metrics
+
+    record = await load_run(req.run_id)
+    if record is None:
+        raise HTTPException(404, f"历史记录不存在: {req.run_id}")
+
+    engine_id = record.get("engine", "")
+    if engine_id == "drl":
+        raise HTTPException(400, "DRL 引擎的 PPO 策略权重未持久化，暂不支持 OOS 参数复用验证")
+
+    strategy_ids: list[str] = record.get("strategies", [])
+    best_params: dict = record.get("best_params") or {}
+    timeframe: str = record.get("timeframe", "1d")
+
+    # 获取当前已加载数据
+    async with _data_lock:
+        if "current" not in _data_store:
+            raise HTTPException(400, "尚未加载任何数据，请先拉取 Binance K线或上传 CSV")
+        df = _data_store["current"]
+        data_source = _data_store.get("source", "unknown")
+
+    await manager.broadcast({"type": "run_status", "status": "running", "engine": engine_id})
+    await manager.send_log("info", f"[OOS 验证] 复用 run_id={req.run_id} 的参数，在新数据上验证...")
+
+    async def _run_validate() -> None:
+        try:
+            if engine_id == "bayesian":
+                # 每个策略有独立 best_params，strategy_ids 与 best_params 一一对应
+                for sid in strategy_ids:
+                    if sid not in STRATEGY_REGISTRY:
+                        await manager.send_log("warn", f"[OOS] 跳过未知策略: {sid}")
+                        continue
+                    strategy = STRATEGY_REGISTRY[sid]
+                    params = best_params if len(strategy_ids) == 1 else best_params.get(sid, best_params)
+                    try:
+                        signals = await asyncio.to_thread(strategy.generate_signals, df, params)
+                        metrics = compute_all_metrics(signals, timeframe=timeframe)
+                        result_dict = {
+                            "engine":        engine_id,
+                            "strategy":      sid,
+                            "strategy_name": strategy.name,
+                            "best_params":   params,
+                            "sharpe":        metrics["sharpe"],
+                            "calmar":        metrics["calmar"],
+                            "max_drawdown":  metrics["max_drawdown"],
+                            "annual_return": metrics["annual_return"],
+                            "equity_curve":  metrics.get("equity_curve", []),
+                            "extra_plots":   {},
+                            "weight_history": [],
+                            "strategy_names": [],
+                            "validation":    True,
+                            "source_run_id": req.run_id,
+                        }
+                        await manager.send_result(result_dict)
+                        await _persist(engine_id, [sid], f"validate:{req.run_id}", timeframe, result_dict)
+                        await manager.send_log("info", f"[OOS] {strategy.name} Calmar={metrics['calmar']:.3f} Sharpe={metrics['sharpe']:.3f}")
+                    except Exception as exc:
+                        await manager.send_log("error", f"[OOS] {sid} 验证失败: {exc}")
+
+            elif engine_id == "genetic":
+                # GA best_params = {"factor_weights": {...}, "strategy_params": {...}}
+                factor_weights: dict = best_params.get("factor_weights", {})
+                strategy_params: dict = best_params.get("strategy_params", {})
+                if not factor_weights:
+                    raise ValueError("GA best_params 中缺少 factor_weights")
+                combined = pd.Series(0.0, index=df.index)
+                for sid, weight in factor_weights.items():
+                    if sid not in STRATEGY_REGISTRY:
+                        continue
+                    strategy = STRATEGY_REGISTRY[sid]
+                    params = strategy_params.get(sid, {})
+                    try:
+                        sig = await asyncio.to_thread(strategy.generate_signals, df, params)
+                        combined += weight * sig
+                    except Exception:
+                        pass
+                metrics = compute_all_metrics(combined, timeframe=timeframe)
+                result_dict = {
+                    "engine":        engine_id,
+                    "strategy":      "portfolio",
+                    "strategy_name": "GA Portfolio (OOS)",
+                    "best_params":   best_params,
+                    "sharpe":        metrics["sharpe"],
+                    "calmar":        metrics["calmar"],
+                    "max_drawdown":  metrics["max_drawdown"],
+                    "annual_return": metrics["annual_return"],
+                    "equity_curve":  metrics.get("equity_curve", []),
+                    "extra_plots":   {"factor_weights": factor_weights},
+                    "weight_history": [],
+                    "strategy_names": list(factor_weights.keys()),
+                    "validation":    True,
+                    "source_run_id": req.run_id,
+                }
+                await manager.send_result(result_dict)
+                await _persist(engine_id, strategy_ids, f"validate:{req.run_id}", timeframe, result_dict)
+                await manager.send_log("info", f"[OOS] GA Portfolio Calmar={metrics['calmar']:.3f} Sharpe={metrics['sharpe']:.3f}")
+
+            await manager.send_log("info", "[OOS 验证] 完成。对比 IS 与 OOS 指标以判断过拟合程度。")
+            await manager.broadcast({"type": "run_status", "status": "complete"})
+
+        except Exception as exc:
+            logger.exception("OOS 验证任务异常")
+            await manager.send_log("error", f"[OOS 验证] 失败: {exc}")
+            await manager.broadcast({"type": "run_status", "status": "error", "message": str(exc)})
+
+    asyncio.create_task(_run_validate())
+    return {"status": "started", "mode": "oos_validation", "run_id": req.run_id}
 
 
 # -----------------------------------------------------------------------

@@ -36,6 +36,8 @@ export interface EngineResultData {
   };
   weight_history?: number[][];    // DRL/GA: [[w1,w2,...] per timestep]
   strategy_names?: string[];      // DRL/GA: strategy names for weight chart
+  validation?: boolean;           // true = OOS 样本外验证结果
+  source_run_id?: string;         // 来源 run 的 ID（validation=true 时）
 }
 
 export interface RunRequest {

@@ -93,6 +93,7 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
             }`}
           >
             [{r.engine}] {r.strategy_name}
+            {r.validation && <span className="ml-1 text-[9px] text-accent-amber">[OOS]</span>}
           </button>
         ))}
         <button
