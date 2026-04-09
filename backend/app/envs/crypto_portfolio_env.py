@@ -34,6 +34,8 @@ class CryptoPortfolioEnv(gym.Env):
         max_drawdown: float = -15.0,
         friction_penalty: float = 0.0005,
         noise_std: float = 0.002,
+        slippage_bps: float = 5.0,
+        risk_penalty_mult: float = 0.1,
     ):
         super().__init__()
 
@@ -51,6 +53,8 @@ class CryptoPortfolioEnv(gym.Env):
         self.max_drawdown_limit = max_drawdown / 100.0  # 如 -15.0 → -0.15
         self.friction_penalty = friction_penalty
         self.noise_std = noise_std
+        self.slippage_bps = slippage_bps
+        self.risk_penalty_mult = risk_penalty_mult
 
         # 动作空间：n_assets 维原始动作，step 中做 Softmax 归一化
         self.action_space = spaces.Box(
@@ -112,11 +116,14 @@ class CryptoPortfolioEnv(gym.Env):
         friction_cost = (
             np.sum(np.abs(target_weights - self._weights)) * self.friction_penalty
         )
-        # 风险惩罚：最差资产负收益的 10% 作为额外扣减
+        # 风险惩罚：最差资产负收益的 risk_penalty_mult 作为额外扣减
         worst_loss = max(0.0, -float(np.min(noisy_return)))
-        risk_penalty = worst_loss * 0.1
+        risk_penalty = worst_loss * self.risk_penalty_mult
 
-        step_return = float(np.dot(target_weights, noisy_return)) - friction_cost - risk_penalty
+        # 滑点成本：基于调仓幅度和滑点基点
+        slippage_cost = np.sum(np.abs(target_weights - self._weights)) * self.slippage_bps / 10000
+
+        step_return = float(np.dot(target_weights, noisy_return)) - friction_cost - risk_penalty - slippage_cost
 
         # 单利累积净值
         self._portfolio_value += step_return

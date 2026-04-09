@@ -24,6 +24,7 @@ import hashlib
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 import numpy as np
@@ -143,13 +144,29 @@ class DRLEngine(BaseEngine):
         val_returns_list = []
         strategy_names = []
 
-        for strategy in strategies:
-            default_params = self._get_default_params(strategy)
-            train_sig = strategy.generate_signals(df_train, default_params)
-            val_sig = strategy.generate_signals(df_val, default_params)
-            train_returns_list.append(train_sig.values.astype(np.float32))
-            val_returns_list.append(val_sig.values.astype(np.float32))
-            strategy_names.append(strategy.name)
+        def _gen_signal(strategy, df_chunk, default_params):
+            return strategy.generate_signals(df_chunk, default_params)
+
+        with ThreadPoolExecutor(max_workers=min(len(strategies), 8)) as executor:
+            futures = {
+                executor.submit(
+                    _gen_signal, s, df_train, self._get_default_params(s)
+                ): s
+                for s in strategies
+            }
+            val_futures = {
+                executor.submit(
+                    _gen_signal, s, df_val, self._get_default_params(s)
+                ): s
+                for s in strategies
+            }
+            for future, s in futures.items():
+                train_sig = future.result()
+                train_returns_list.append(train_sig.values.astype(np.float32))
+                strategy_names.append(s.name)
+            for future, s in val_futures.items():
+                val_sig = future.result()
+                val_returns_list.append(val_sig.values.astype(np.float32))
 
         train_matrix = np.column_stack(train_returns_list)  # (T_train, n_strategies)
         val_matrix = np.column_stack(val_returns_list)       # (T_val, n_strategies)

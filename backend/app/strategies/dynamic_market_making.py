@@ -42,6 +42,8 @@ class DynamicMarketMakingStrategy(BaseStrategy):
             "inventory_penalty": trial.suggest_float("inventory_penalty", 0.0005, 0.005),
             "momentum_pause": trial.suggest_float("momentum_pause", 0.02, 0.08),
             "mom_period": trial.suggest_int("mom_period", 5, 20),
+            "inventory_decay": trial.suggest_float("inventory_decay", 0.85, 0.99),
+            "flow_mult": trial.suggest_float("flow_mult", 0.01, 0.5),
         }
 
     def generate_signals(self, df: pd.DataFrame, params: dict) -> pd.Series:
@@ -77,7 +79,7 @@ class DynamicMarketMakingStrategy(BaseStrategy):
 
             # 根据订单簿不平衡模拟净成交
             flow = ob.iloc[i] if not np.isnan(ob.iloc[i]) else 0.0
-            inventory += flow * 0.1
+            inventory += flow * params.get("flow_mult", 0.1)
 
             # 做市收益 = 半个 spread 减去库存惩罚
             mm_pnl = dynamic_spread / 2.0 - inv_penalty * abs(inventory)
@@ -89,7 +91,7 @@ class DynamicMarketMakingStrategy(BaseStrategy):
             strategy_return.iloc[i] = mm_pnl + adverse
 
             # 库存均值回归
-            inventory *= 0.95
+            inventory *= params.get("inventory_decay", 0.95)
 
         return pd.Series(strategy_return, index=df.index)
 

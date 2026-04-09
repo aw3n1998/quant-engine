@@ -109,6 +109,12 @@ def equity_curve(returns: pd.Series) -> list[float]:
     return curve.tolist()
 
 
+def safe_mean(values: list[float]) -> float:
+    """安全均值：过滤 -inf/nan，全部无效返回 -10.0"""
+    finite = [v for v in values if np.isfinite(v)]
+    return float(np.mean(finite)) if finite else -10.0
+
+
 def compute_all_metrics(returns: pd.Series, timeframe: str = "1d") -> dict:
     """
     一次性计算所有核心绩效指标

@@ -152,8 +152,10 @@ async def fetch_binance(req: BinanceFetchRequest) -> dict[str, Any]:
         raise HTTPException(400, f"不支持的时间框架: {req.timeframe}。支持: {SUPPORTED_TIMEFRAMES}")
     if not (10 <= req.limit <= 100_000):
         raise HTTPException(400, "limit 范围: 10 ~ 100000")
-    if req.use_nlp and not req.worldnews_api_key.strip():
-        raise HTTPException(400, "use_nlp=true 时需提供 worldnews_api_key")
+    # 若未提供 API Key，使用配置中的默认值
+    api_key_to_use = req.worldnews_api_key.strip() or config.worldnews_api_key
+    if req.use_nlp and not api_key_to_use:
+        raise HTTPException(400, "use_nlp=true 时需提供 worldnews_api_key 或在 .env 中配置")
 
     await manager.broadcast({
         "type": "log", "level": "info",
@@ -186,7 +188,7 @@ async def fetch_binance(req: BinanceFetchRequest) -> dict[str, Any]:
             "message": f"[NLP] 正在拉取 WorldNewsAPI 新闻情绪数据（{req.symbol}）...",
         })
         nlp_task = asyncio.create_task(
-            fetch_nlp_sentiment(df.index, req.symbol, req.timeframe, req.worldnews_api_key)
+            fetch_nlp_sentiment(df.index, req.symbol, req.timeframe, api_key_to_use)
         )
 
     # 等待附加数据拉取完成

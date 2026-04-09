@@ -254,6 +254,7 @@ class GeneticEngine(BaseEngine):
         bounds: dict,
         n_splits: int,
         timeframe: str,
+        fitness_cache: dict | None = None,
     ) -> float:
         """
         ┌───────────────────────────────────────────────────────────────┐
@@ -272,6 +273,11 @@ class GeneticEngine(BaseEngine):
         │    高斯变异：引入随机扰动维持多样性，平衡"探索"与"利用"。        │
         └───────────────────────────────────────────────────────────────┘
         """
+        if fitness_cache is not None:
+            cache_key = chromosome.tobytes()
+            if cache_key in fitness_cache:
+                return fitness_cache[cache_key]
+
         params = self._decode_params(chromosome, bounds)
         total = len(df)
 
@@ -294,7 +300,10 @@ class GeneticEngine(BaseEngine):
             except Exception:
                 fold_calmars.append(-10.0)
 
-        return float(np.mean(fold_calmars)) if fold_calmars else float("-inf")
+        result = float(np.mean(fold_calmars)) if fold_calmars else float("-inf")
+        if fitness_cache is not None:
+            fitness_cache[chromosome.tobytes()] = result
+        return result
 
     def _tournament_select(
         self, population: np.ndarray, fitness: list[float], k: int
@@ -349,10 +358,11 @@ class GeneticEngine(BaseEngine):
         # 随机初始化种群
         population = np.random.uniform(0.0, 1.0, size=(pop_size, n_genes)).astype(np.float32)
         convergence = []
+        fitness_cache: dict = {}
 
         for gen in range(generations):
             fitness = [
-                self._wfv_fitness(strategy, df_is, chrom, bounds, n_splits, timeframe)
+                self._wfv_fitness(strategy, df_is, chrom, bounds, n_splits, timeframe, fitness_cache)
                 for chrom in population
             ]
 
@@ -396,7 +406,7 @@ class GeneticEngine(BaseEngine):
 
         # 最终最优个体
         final_fitness = [
-            self._wfv_fitness(strategy, df_is, chrom, bounds, n_splits, timeframe)
+            self._wfv_fitness(strategy, df_is, chrom, bounds, n_splits, timeframe, fitness_cache)
             for chrom in population
         ]
         best_idx = int(np.argmax([f if np.isfinite(f) else -999 for f in final_fitness]))

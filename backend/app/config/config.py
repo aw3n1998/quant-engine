@@ -3,11 +3,23 @@
 全局配置模块
 集中管理所有可调参数，便于统一修改和环境切换
 """
+import os
+from pathlib import Path
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# 加载 .env 文件
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 
 class AppConfig(BaseModel):
     """应用全局配置"""
+
+    # --- API Keys & External Services ---
+    worldnews_api_key: str = os.getenv("WORLDNEWS_API_KEY", "")
+    flashbots_enabled: bool = os.getenv("FLASHBOTS_ENABLED", "true").lower() == "true"
+    db_path: str = os.getenv("DB_PATH", "data/quant_engine.db")
 
     # --- 数据 ---
     default_data_rows: int = 2000
@@ -41,6 +53,11 @@ class AppConfig(BaseModel):
     ga_tournament_k: int = 3           # 锦标赛规模
     ga_elite_ratio: float = 0.1        # 精英保留比例
     ga_crossover_alpha: float = 0.5    # BLX-α 交叉参数
+
+    # --- Trading Simulation ---
+    risk_penalty_mult: float = 0.1       # env 风险惩罚系数
+    slippage_bps: float = 5.0            # 滑点模拟（基点）
+    inventory_decay: float = 0.95        # market making 库存衰减
 
     # --- WebSocket ---
     ws_heartbeat_interval: int = 30

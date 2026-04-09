@@ -59,14 +59,13 @@ class MADTrendStrategy(BaseStrategy):
         vol_ma = df["volume"].rolling(vol_window).mean()
         vol_confirm = df["volume"] > vol_thresh * vol_ma
 
-        position = pd.Series(0.0, index=df.index)
-        pos = 0.0
-        for i in range(window, len(df)):
-            if close.iloc[i] > upper.iloc[i] and vol_confirm.iloc[i]:
-                pos = 1.0
-            elif close.iloc[i] < lower.iloc[i] and vol_confirm.iloc[i]:
-                pos = -1.0
-            position.iloc[i] = pos
+        long_signal = (close > upper) & vol_confirm
+        short_signal = (close < lower) & vol_confirm
+        raw_pos = pd.Series(np.nan, index=df.index)
+        raw_pos[long_signal] = 1.0
+        raw_pos[short_signal] = -1.0
+        raw_pos.iloc[:window] = 0.0
+        position = raw_pos.ffill().fillna(0.0)
 
         daily_return = close.pct_change()
         strategy_return = (position.shift(1) * daily_return).fillna(0.0)

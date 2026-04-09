@@ -1,31 +1,20 @@
-// frontend/src/components/MetricCard.tsx
-
-import { formatPercent, formatNumber } from "../utils/formatters";
-
 interface MetricCardProps {
   label: string;
-  value: number;
-  isPercent?: boolean;
-  colorClass?: string;
+  value: string;
+  positive?: boolean;
 }
 
-export default function MetricCard({
-  label,
-  value,
-  isPercent = false,
-  colorClass = "text-accent-cyan",
-}: MetricCardProps) {
-  const displayValue = isPercent ? formatPercent(value) : formatNumber(value);
+export default function MetricCard({ label, value, positive }: MetricCardProps) {
+  const valueColor = positive === undefined
+    ? 'text-text-primary'
+    : positive
+      ? 'text-accent-emerald'
+      : 'text-accent-magenta';
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-surface-700/50 bg-surface-800/60 p-4 backdrop-blur-sm transition-all duration-300 hover:border-surface-600/80 hover:bg-surface-800/80">
-      <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-gradient-to-br from-accent-violet/10 to-accent-cyan/10 blur-2xl" />
-      <p className="mb-1 text-xs font-medium uppercase tracking-wider text-surface-400">
-        {label}
-      </p>
-      <p className={`text-2xl font-semibold tabular-nums ${colorClass}`}>
-        {displayValue}
-      </p>
+    <div className="border border-border-base bg-bg-secondary p-4 text-center hover:border-border-bright transition-colors">
+      <div className="text-caption text-text-secondary uppercase tracking-widest mb-1">{label}</div>
+      <div className={`text-metric font-mono ${valueColor}`}>{value}</div>
     </div>
   );
 }
