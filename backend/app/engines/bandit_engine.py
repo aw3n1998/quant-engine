@@ -58,7 +58,7 @@ class BanditEngine(BaseEngine):
                 log_callback(level, msg)
 
         # 支持多策略（routes.py 通过 strategies 列表传入）
-        strategies: list[BaseStrategy] = kwargs.get("strategies", [strategy])
+        strategies: list[BaseStrategy] = strategy if isinstance(strategy, list) else [strategy]
         timeframe: str = kwargs.get("timeframe", "1d")
         oos_split: float = kwargs.get("oos_split", 20.0)
 

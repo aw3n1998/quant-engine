@@ -68,7 +68,7 @@ class MonteCarloEngine(BaseEngine):
             if log_callback:
                 log_callback(level, msg)
 
-        strategies: list[BaseStrategy] = kwargs.get("strategies", [strategy])
+        strategies: list[BaseStrategy] = strategy if isinstance(strategy, list) else [strategy]
         timeframe: str    = kwargs.get("timeframe", "1d")
         oos_split: float  = kwargs.get("oos_split", 20.0)
         n_trials: int     = kwargs.get("optuna_trials", 30)

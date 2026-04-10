@@ -88,3 +88,15 @@ export async function fetchHistoryRun(run_id: string): Promise<Record<string, un
 export async function deleteHistoryRun(run_id: string): Promise<{ status: string }> {
   return request<{ status: string }>(`/history/${run_id}`, { method: "DELETE" });
 }
+
+export async function combineEngines(payload: {
+  run_ids: string[];
+  weights?: number[];
+  label?: string;
+  timeframe?: string;
+}): Promise<{ status: string }> {
+  return request<{ status: string }>("/combine", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

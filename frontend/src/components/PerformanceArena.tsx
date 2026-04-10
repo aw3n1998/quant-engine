@@ -16,6 +16,7 @@ interface Props {
 export default function PerformanceArena({ results, onClear, progressPlots, runStatus, factorWeights }: Props) {
   const [resultIdx, setResultIdx] = useState(0);
   const [activeTab, setActiveTab] = useState('equity');
+  const [equityOverlay, setEquityOverlay] = useState(false);
 
   // 训练进行中 — 实时双轴训练曲线（全屏）
   if (runStatus === 'running' && progressPlots.length > 0) {
@@ -130,25 +131,59 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
 
         {/* EQUITY — OOS 权益曲线 */}
         {validTab === 'equity' && (
-          equity_curve && equity_curve.length > 0 ? (
-            <Plot
-              data={[{
-                y: equity_curve,
-                type: 'scatter', mode: 'lines', fill: 'tozeroy', name: 'OOS Equity',
-                line: { color: '#00FF41', width: 2 },
-                fillcolor: 'rgba(0,255,65,0.08)',
-              }]}
-              layout={hackerLayout({
-                title: { text: 'OOS Equity Curve (Simple Interest)', font: { color: '#00FF41', size: 13 } },
-                xaxis: { title: 'Bar', gridcolor: '#122012', color: '#00FF41' },
-                yaxis: { title: 'Cumulative Return', gridcolor: '#122012', color: '#00FF41' },
-              })}
-              useResizeHandler
-              style={{ width: '100%', height: 340 }}
-            />
-          ) : (
-            <div className="h-[340px] flex items-center justify-center text-text-muted text-caption">NO EQUITY DATA</div>
-          )
+          <div>
+            {results.length >= 2 && (
+              <div className="flex justify-end mb-2">
+                <button
+                  onClick={() => setEquityOverlay(o => !o)}
+                  className={`text-[11px] px-2 py-0.5 border font-mono transition-colors ${
+                    equityOverlay
+                      ? 'border-[#00FFFF] text-[#00FFFF] bg-[#00FFFF]/10'
+                      : 'border-[#008F11]/50 text-[#008F11] hover:text-[#00FF41] hover:border-[#00FF41]'
+                  }`}
+                >
+                  {equityOverlay ? '[OVERLAY ✓]' : '[OVERLAY]'}
+                </button>
+              </div>
+            )}
+            {equityOverlay && results.length >= 2 ? (
+              <Plot
+                data={results.map((r, i) => ({
+                  y: r.equity_curve ?? [],
+                  type: 'scatter' as const,
+                  mode: 'lines' as const,
+                  name: `[${r.engine}] ${r.strategy_name}`,
+                  line: { color: STRATEGY_COLORS[i % STRATEGY_COLORS.length], width: 1.5 },
+                }))}
+                layout={hackerLayout({
+                  title: { text: 'OOS Equity Overlay (All Results)', font: { color: '#00FF41', size: 13 } },
+                  xaxis: { title: 'Bar', gridcolor: '#122012', color: '#00FF41' },
+                  yaxis: { title: 'Cumulative Return', gridcolor: '#122012', color: '#00FF41' },
+                  legend: { font: { color: '#008F11', size: 10 }, bgcolor: 'rgba(0,0,0,0.5)' },
+                })}
+                useResizeHandler
+                style={{ width: '100%', height: 340 }}
+              />
+            ) : equity_curve && equity_curve.length > 0 ? (
+              <Plot
+                data={[{
+                  y: equity_curve,
+                  type: 'scatter', mode: 'lines', fill: 'tozeroy', name: 'OOS Equity',
+                  line: { color: '#00FF41', width: 2 },
+                  fillcolor: 'rgba(0,255,65,0.08)',
+                }]}
+                layout={hackerLayout({
+                  title: { text: 'OOS Equity Curve (Simple Interest)', font: { color: '#00FF41', size: 13 } },
+                  xaxis: { title: 'Bar', gridcolor: '#122012', color: '#00FF41' },
+                  yaxis: { title: 'Cumulative Return', gridcolor: '#122012', color: '#00FF41' },
+                })}
+                useResizeHandler
+                style={{ width: '100%', height: 340 }}
+              />
+            ) : (
+              <div className="h-[340px] flex items-center justify-center text-text-muted text-caption">NO EQUITY DATA</div>
+            )}
+          </div>
         )}
 
         {/* WEIGHTS — 策略权重时序堆积面积图 */}

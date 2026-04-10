@@ -6,6 +6,7 @@ import Singularity from '../components/Singularity';
 import HistoryPanel from '../components/HistoryPanel';
 import TabBar from '../components/ui/TabBar';
 import HelpModal from '../components/ui/HelpModal';
+import type { EngineResultData } from '../types';
 
 const MAIN_TABS = [
   { id: 'results',  label: 'RESULTS'  },
@@ -23,6 +24,7 @@ export default function Dashboard() {
   const [mainTab, setMainTab]               = useState('results');
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [showHelp, setShowHelp]             = useState(false);
+  const [comparedResults, setComparedResults] = useState<EngineResultData[]>([]);
 
   // 引擎跑完自动刷新历史记录
   useEffect(() => {
@@ -30,6 +32,16 @@ export default function Dashboard() {
       setHistoryRefreshKey(k => k + 1);
     }
   }, [runStatus]);
+
+  const handleHistoryCompare = (loaded: EngineResultData[]) => {
+    setComparedResults(loaded);
+    setMainTab('results');
+  };
+
+  const handleClearAll = () => {
+    clearResults();
+    setComparedResults([]);
+  };
 
   const singularityStatus: 'idle' | 'running' | 'done' | 'error' =
     !connected          ? 'error'   :
@@ -109,15 +121,20 @@ export default function Dashboard() {
 
           {mainTab === 'results' && (
             <PerformanceArena
-              results={results}
-              onClear={clearResults}
+              results={[...results, ...comparedResults]}
+              onClear={handleClearAll}
               progressPlots={progressPlots}
               runStatus={runStatus}
               factorWeights={factorWeights}
             />
           )}
 
-          {mainTab === 'history' && <HistoryPanel refreshKey={historyRefreshKey} />}
+          {mainTab === 'history' && (
+            <HistoryPanel
+              refreshKey={historyRefreshKey}
+              onCompare={handleHistoryCompare}
+            />
+          )}
 
           {mainTab === 'logs' && (
             <div className="border border-border-base bg-bg-secondary p-4 overflow-y-auto flex-1">

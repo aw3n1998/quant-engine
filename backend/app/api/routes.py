@@ -481,6 +481,115 @@ async def validate_params(req: ValidateRequest) -> dict[str, str]:
 
 
 # -----------------------------------------------------------------------
+# 引擎结合端点（Engine Fusion）
+# -----------------------------------------------------------------------
+
+class CombineRequest(BaseModel):
+    run_ids: list[str]                 # 2-8 个历史 run_id
+    weights: list[float] | None = None # 可选权重，缺省等权
+    label: str = "Engine Fusion"       # 显示名称
+    timeframe: str = "1d"              # 用于年化计算
+
+
+@router.post("/combine")
+async def combine_engines(req: CombineRequest) -> dict[str, str]:
+    """
+    将多个历史引擎运行的 OOS equity_curve 按权重融合，计算组合指标。
+    结果通过 WebSocket broadcast，格式与普通 run 结果相同。
+    """
+    if len(req.run_ids) < 2:
+        raise HTTPException(400, "至少需要 2 个 run_id")
+    if len(req.run_ids) > 8:
+        raise HTTPException(400, "最多支持 8 个 run_id")
+    if req.weights and len(req.weights) != len(req.run_ids):
+        raise HTTPException(400, "weights 长度必须与 run_ids 相同")
+
+    async def _run_combine() -> None:
+        from app.utils.persistence import load_run
+        from app.utils.metrics import compute_all_metrics
+        import numpy as np
+        import pandas as pd
+
+        await manager.broadcast({"type": "run_status", "status": "running", "engine": "fusion"})
+        await manager.send_log("info", f"[FUSION] 开始融合 {len(req.run_ids)} 个引擎结果...")
+
+        try:
+            equity_curves: list[list[float]] = []
+            labels: list[str] = []
+
+            for run_id in req.run_ids:
+                record = await load_run(run_id)
+                if record is None:
+                    raise ValueError(f"run_id 不存在: {run_id}")
+                eq = record.get("equity_curve") or []
+                if len(eq) < 2:
+                    raise ValueError(f"run {run_id} equity_curve 数据不足")
+                equity_curves.append(eq)
+                eng  = record.get("engine", "?")
+                strs = ",".join((record.get("strategies") or [])[:2])
+                labels.append(f"{eng}/{strs}")
+                await manager.send_log("info", f"[FUSION] 加载: {eng} | equity_len={len(eq)}")
+
+            # 归一化权重
+            n = len(equity_curves)
+            weights_raw = req.weights if req.weights else [1.0 / n] * n
+            total_w = sum(weights_raw)
+            weights_norm = [w / total_w for w in weights_raw]
+
+            # 对齐长度（取最短）
+            min_len = min(len(eq) for eq in equity_curves)
+            equity_curves = [eq[:min_len] for eq in equity_curves]
+
+            # equity_curve → 收益率序列 r[t] = equity[t]/equity[t-1] - 1
+            return_series: list[list[float]] = []
+            for eq in equity_curves:
+                rets = [0.0]
+                for t in range(1, len(eq)):
+                    prev = eq[t - 1]
+                    rets.append((eq[t] - prev) / prev if abs(prev) > 1e-10 else 0.0)
+                return_series.append(rets)
+
+            # 加权平均收益率
+            combined_rets = [
+                sum(weights_norm[i] * return_series[i][t] for i in range(n))
+                for t in range(min_len)
+            ]
+
+            combined_series = pd.Series(combined_rets)
+            metrics = compute_all_metrics(combined_series, timeframe=req.timeframe)
+
+            weight_params = {f"w_{labels[i]}": round(weights_norm[i], 4) for i in range(n)}
+
+            result_dict = {
+                "engine":        "fusion",
+                "strategy":      "combined",
+                "strategy_name": req.label,
+                "best_params":   weight_params,
+                "sharpe":        metrics["sharpe"],
+                "calmar":        metrics["calmar"],
+                "max_drawdown":  metrics["max_drawdown"],
+                "annual_return": metrics["annual_return"],
+                "equity_curve":  metrics["equity_curve"],
+                "extra_plots":   {"factor_weights": {labels[i]: round(weights_norm[i], 4) for i in range(n)}},
+                "weight_history": [],
+                "strategy_names": labels,
+            }
+
+            await manager.send_result(result_dict)
+            await _persist("fusion", req.run_ids, "history_fusion", req.timeframe, result_dict)
+            await manager.send_log("info", f"[FUSION] 完成 | Sharpe={metrics['sharpe']:.3f} Calmar={metrics['calmar']:.3f}")
+            await manager.broadcast({"type": "run_status", "status": "complete"})
+
+        except Exception as exc:
+            logger.exception("Engine fusion 失败")
+            await manager.send_log("error", f"[FUSION] 失败: {exc}")
+            await manager.broadcast({"type": "run_status", "status": "error", "message": str(exc)})
+
+    asyncio.create_task(_run_combine())
+    return {"status": "started", "mode": "engine_fusion", "count": str(len(req.run_ids))}
+
+
+# -----------------------------------------------------------------------
 # 后台运行任务
 # -----------------------------------------------------------------------
 
