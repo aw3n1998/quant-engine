@@ -23,6 +23,7 @@ import pandas as pd
 
 from app.core.base_strategy import BaseStrategy
 from app.core.strategy_registry import STRATEGY_REGISTRY
+from app.utils.friction import apply_friction_costs
 
 
 class FibonacciResonanceStrategy(BaseStrategy):
@@ -66,16 +67,16 @@ class FibonacciResonanceStrategy(BaseStrategy):
 
         position = position.clip(-1, 1)
 
-        daily_return = close.pct_change()
-        strategy_return = (position.shift(1) * daily_return).fillna(0.0)
+        # 先扣除摩擦成本，再计算止损（净收益的累计回撤触发止损更真实）
+        net_return = apply_friction_costs(position, df)
 
-        # 简易止损: 回撤超过阈值则清仓
-        cumulative = (1 + strategy_return).cumprod()
+        # 简易止损: 净收益累计回撤超过阈值则清仓
+        cumulative = (1 + net_return).cumprod()
         peak = cumulative.cummax()
         drawdown = (cumulative - peak) / peak
-        strategy_return = np.where(drawdown < -stop_loss, 0.0, strategy_return)
+        net_return = np.where(drawdown < -stop_loss, 0.0, net_return)
 
-        return pd.Series(strategy_return, index=df.index)
+        return pd.Series(net_return, index=df.index)
 
 
 STRATEGY_REGISTRY.register("fibonacci_resonance", FibonacciResonanceStrategy())

@@ -103,8 +103,8 @@ export default function Dashboard() {
 
           <TabBar tabs={MAIN_TABS} active={mainTab} onChange={setMainTab} />
 
-          {/* 新手引导横幅 — 仅在 idle 且无结果时显示 */}
-          {results.length === 0 && runStatus === 'idle' && (
+          {/* 新手引导横幅 — 仅在 idle 且无结果（含对比结果）时显示 */}
+          {results.length === 0 && comparedResults.length === 0 && runStatus === 'idle' && (
             <div className="border border-accent-cyan/30 bg-accent-cyan/5 p-3 flex gap-6 text-caption">
               {[
                 { step: '① 选数据', desc: '侧边栏 DATA SOURCE 选择数据来源' },

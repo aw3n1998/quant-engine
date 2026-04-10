@@ -59,6 +59,7 @@ export default function ControlPanel({ connected, runStatus }: Props) {
   const [wfvFolds, setWfvFolds] = useState(5);
   const [bayesianStrategies, setBayesianStrategies] = useState(["fibonacci_resonance"]);
   const [gaStrategies, setGaStrategies] = useState(["fibonacci_resonance", "mad_trend"]);
+  const [ensembleStrategies, setEnsembleStrategies] = useState(["rsi_momentum", "bollinger_squeeze", "mad_trend"]);
   const [gaPopulation, setGaPopulation] = useState(40);
   const [gaGenerations, setGaGenerations] = useState(25);
   const [expertMode, setExpertMode] = useState(false);
@@ -272,16 +273,16 @@ export default function ControlPanel({ connected, runStatus }: Props) {
             {STRATEGY_OPTIONS.map(s => (
               <label key={s} className="flex items-center gap-2 cursor-pointer text-caption hover:text-text-primary transition-colors"
                 title={STRATEGY_META[s]?.desc}>
-                <input type="checkbox" checked={gaStrategies.includes(s)}
-                  onChange={e => toggleStrategy(gaStrategies, setGaStrategies, s, e.target.checked)}
+                <input type="checkbox" checked={ensembleStrategies.includes(s)}
+                  onChange={e => toggleStrategy(ensembleStrategies, setEnsembleStrategies, s, e.target.checked)}
                   className="accent-accent-emerald" />
                 <span>{STRATEGY_META[s]?.name ?? s}</span>
               </label>
             ))}
           </div>
         </div>
-        <GlowButton fullWidth onClick={() => handleRun("ensemble", gaStrategies)}
-          disabled={running || !connected || gaStrategies.length === 0} loading={running}>
+        <GlowButton fullWidth onClick={() => handleRun("ensemble", ensembleStrategies)}
+          disabled={running || !connected || ensembleStrategies.length === 0} loading={running}>
           [FUSE EXPERT SIGNALS]
         </GlowButton>
       </TerminalSection>

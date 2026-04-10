@@ -24,6 +24,7 @@ import pandas as pd
 
 from app.core.base_strategy import BaseStrategy
 from app.core.strategy_registry import STRATEGY_REGISTRY
+from app.utils.friction import apply_friction_costs
 
 
 class LiquidationHuntingStrategy(BaseStrategy):
@@ -93,9 +94,7 @@ class LiquidationHuntingStrategy(BaseStrategy):
 
             position.iloc[i] = pos
 
-        daily_return = df["close"].pct_change()
-        strategy_return = (position.shift(1) * daily_return).fillna(0.0)
-        return pd.Series(strategy_return, index=df.index)
+        return apply_friction_costs(position, df)
 
 
 STRATEGY_REGISTRY.register("liquidation_hunting", LiquidationHuntingStrategy())

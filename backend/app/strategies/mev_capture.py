@@ -24,6 +24,7 @@ import pandas as pd
 
 from app.core.base_strategy import BaseStrategy
 from app.core.strategy_registry import STRATEGY_REGISTRY
+from app.utils.friction import apply_friction_costs
 
 
 class MEVCaptureStrategy(BaseStrategy):
@@ -67,8 +68,7 @@ class MEVCaptureStrategy(BaseStrategy):
                 if rank_val > high_pct:
                     position.iloc[i] = scale if mom_val > 0 else -scale
 
-            daily_return = df["close"].pct_change()
-            return (position.shift(1) * daily_return).fillna(0.0)
+            return apply_friction_costs(position, df)
 
         mev = df["onchain_mev_score"].rolling(mev_smooth).mean()
 
@@ -96,9 +96,7 @@ class MEVCaptureStrategy(BaseStrategy):
                 # 低 MEV 期: 维持小仓位或观望
                 position.iloc[i] = 0.0
 
-        daily_return = df["close"].pct_change()
-        strategy_return = (position.shift(1) * daily_return).fillna(0.0)
-        return pd.Series(strategy_return, index=df.index)
+        return apply_friction_costs(position, df)
 
 
 STRATEGY_REGISTRY.register("mev_capture", MEVCaptureStrategy())

@@ -24,6 +24,7 @@ import pandas as pd
 
 from app.core.base_strategy import BaseStrategy
 from app.core.strategy_registry import STRATEGY_REGISTRY
+from app.utils.friction import apply_friction_costs
 
 
 class VolumePriceMomentumStrategy(BaseStrategy):
@@ -105,8 +106,7 @@ class VolumePriceMomentumStrategy(BaseStrategy):
 
             position.iloc[i] = pos
 
-        daily_ret = close.pct_change()
-        return (position.shift(1) * daily_ret).fillna(0.0)
+        return apply_friction_costs(position, df)
 
 
 STRATEGY_REGISTRY.register("volume_price_momentum", VolumePriceMomentumStrategy())
