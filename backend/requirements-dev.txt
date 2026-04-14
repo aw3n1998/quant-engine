@@ -1,0 +1,25 @@
+# 开发依赖
+# 基础
+-r requirements.txt
+
+# 测试框架
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# 代码风格和类型检查
+black>=23.7.0
+mypy>=1.5.0
+flake8>=6.1.0
+
+# 文档生成
+sphinx>=7.0.0
+sphinx-rtd-theme>=1.3.0
+
+# 调试和性能分析
+ipdb>=0.13.0
+line-profiler>=4.0.0
+memory-profiler>=0.61.0
+
+# 其他开发工具
+pre-commit>=3.3.0

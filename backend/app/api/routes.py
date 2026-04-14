@@ -19,6 +19,7 @@ from app.core.engine_registry import ENGINE_REGISTRY
 from app.core.strategy_registry import STRATEGY_REGISTRY
 from app.utils.data_generator import generate_synthetic_data
 from app.utils.websocket_manager import manager
+from app.utils.validation import validate_ohlcv_data, DataValidationError, detect_data_quality_issues
 
 logger = logging.getLogger("quant_engine.routes")
 
@@ -108,7 +109,7 @@ async def get_config() -> dict[str, Any]:
 async def upload_data(
     file: UploadFile = File(...),
     timeframe: str = Query(default="1d", description="数据时间框架，影响年化因子计算"),
-) -> dict[str, str]:
+) -> dict[str, Any]:
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(400, "仅支持 CSV 文件")
 
@@ -122,14 +123,11 @@ async def upload_data(
     except Exception as e:
         raise HTTPException(400, f"CSV 解析失败: {e}")
 
-    # 列名统一小写 + 去空格（兼容 Open/HIGH/Close 等大小写变体）
-    df.columns = df.columns.str.lower().str.strip()
-
-    # 必须列检查
-    required = {"open", "high", "low", "close", "volume"}
-    missing = required - set(df.columns)
-    if missing:
-        raise HTTPException(400, f"缺少必需列: {sorted(missing)}")
+    # 验证和修复数据
+    try:
+        df = validate_ohlcv_data(df, strict=False, allow_nan=False, max_nan_ratio=0.1)
+    except DataValidationError as e:
+        raise HTTPException(400, f"数据验证失败: {e}")
 
     # 可选列：缺失时填0（相关策略自动降级）
     optional = ["funding_rate", "ob_imbalance", "onchain_mev_score", "nlp_sentiment"]
@@ -137,13 +135,22 @@ async def upload_data(
         if col not in df.columns:
             df[col] = 0.0
 
+    # 检测数据质量问题（不强制失败，仅提示）
+    quality_issues = detect_data_quality_issues(df)
+
     async with _data_lock:
         _data_store["current"] = df
         _data_store["source"] = "csv"
-        _data_store["timeframe"] = timeframe  # 使用用户指定的时间框架
+        _data_store["timeframe"] = timeframe
+        _data_store["quality_issues"] = quality_issues
 
     logger.info(f"CSV 上传成功: {len(df)} 行，时间框架: {timeframe}")
-    return {"status": "ok", "rows": str(len(df)), "timeframe": timeframe}
+    return {
+        "status": "ok",
+        "rows": str(len(df)),
+        "timeframe": timeframe,
+        "quality": quality_issues,
+    }
 
 
 @router.post("/fetch-binance")
