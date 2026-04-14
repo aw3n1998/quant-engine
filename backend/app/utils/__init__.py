@@ -14,7 +14,7 @@ from app.utils.numba_indicators import fast_ema, fast_rsi, get_fast_rsi
 from app.utils.math_helpers import fractional_diff, get_weights_ffd
 
 # Alpha/Beta 归因
-from app.utils.attribution import calculate_attribution
+from app.utils.attribution import calculate_alpha_beta, rolling_correlation
 
 __all__ = [
     "validate_ohlcv_data",
@@ -25,5 +25,6 @@ __all__ = [
     "get_fast_rsi",
     "fractional_diff",
     "get_weights_ffd",
-    "calculate_attribution",
+    "calculate_alpha_beta",
+    "rolling_correlation",
 ]
