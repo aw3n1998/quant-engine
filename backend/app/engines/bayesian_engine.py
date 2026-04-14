@@ -171,10 +171,21 @@ class BayesianEngine(BaseEngine):
             
             norm_cal = (calmars - calmars.min()) / cal_range
             norm_shr = (sharpes - sharpes.min()) / shr_range
-            
-            # 综合得分 (等权)
-            combined_scores = norm_cal + norm_shr
+
+            # 从 kwargs 获取用户定义的权重，默认为等权（50/50）
+            calmar_weight = kwargs.get("calmar_weight", 0.5)
+            sharpe_weight = kwargs.get("sharpe_weight", 0.5)
+
+            # 归一化权重以确保总和为 1
+            weight_sum = calmar_weight + sharpe_weight
+            calmar_weight = calmar_weight / weight_sum if weight_sum > 0 else 0.5
+            sharpe_weight = sharpe_weight / weight_sum if weight_sum > 0 else 0.5
+
+            # 综合得分（加权组合）
+            combined_scores = (norm_cal * calmar_weight) + (norm_shr * sharpe_weight)
             best_idx = np.argmax(combined_scores)
+
+            emit(f"[{self.name}] 多目标权重: Calmar={calmar_weight:.1%}, Sharpe={sharpe_weight:.1%}")
             best_trial = best_trials[best_idx]
 
         best_params = best_trial.params
