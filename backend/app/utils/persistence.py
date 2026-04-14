@@ -158,10 +158,3 @@ async def delete_run(run_id: str) -> bool:
         )
         await db.commit()
         return cursor.rowcount > 0
-是否成功"""
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            "DELETE FROM run_history WHERE run_id = ?", (run_id,)
-        )
-        await db.commit()
-        return cursor.rowcount > 0

@@ -1,0 +1,553 @@
+[
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "rsi_momentum"
+    ],
+    "strategies_str": "rsi_momentum",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.6687138590876236,
+    "calmar": 1.1695904265744714,
+    "max_drawdown": 0.15110857240112893,
+    "annual_return": 0.1767351396536958,
+    "best_params": {
+      "rsi_period": 10,
+      "lookback": 13,
+      "oversold": 32.154159586565825,
+      "overbought": 65.39466112536516,
+      "trend_ma": 59
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:02:29.148383"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "bollinger_squeeze"
+    ],
+    "strategies_str": "bollinger_squeeze",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.26889892444748636,
+    "calmar": 0.19694950081970866,
+    "max_drawdown": 0.18811939023886187,
+    "annual_return": 0.03705002000205182,
+    "best_params": {
+      "bb_period": 24,
+      "bb_std": 1.600441620806679,
+      "kc_period": 24,
+      "kc_mult": 1.7649808587228182,
+      "hold_bars": 16
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:02:40.870872"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "donchian_breakout"
+    ],
+    "strategies_str": "donchian_breakout",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": -0.1926964665175965,
+    "calmar": -0.49657257361872215,
+    "max_drawdown": 0.2910822942407429,
+    "annual_return": -0.14454348398596784,
+    "best_params": {
+      "entry_period": 35,
+      "exit_period": 24,
+      "atr_period": 15,
+      "atr_min_mult": 0.7693267799589392
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:02:47.860448"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "ema_trend_filter"
+    ],
+    "strategies_str": "ema_trend_filter",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.10456576199722016,
+    "calmar": -0.12791704643380106,
+    "max_drawdown": 0.20218960974587677,
+    "annual_return": -0.025863497698295435,
+    "best_params": {
+      "fast_period": 5,
+      "slow_period": 19,
+      "atr_period": 20,
+      "atr_mult": 1.2172323360744286,
+      "stop_loss_atr": 3.0525293349084937
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:02:55.658983"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "mad_trend"
+    ],
+    "strategies_str": "mad_trend",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": -0.9029190031267335,
+    "calmar": -1.0450206614524162,
+    "max_drawdown": 0.34967391083759536,
+    "annual_return": -0.36541646159615715,
+    "best_params": {
+      "window": 54,
+      "multiplier": 2.265943434099187,
+      "vol_window": 9,
+      "vol_threshold": 1.0418044206235593
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:03:01.043776"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "fibonacci_resonance"
+    ],
+    "strategies_str": "fibonacci_resonance",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": -1.0798769306284466,
+    "calmar": -1.1658505840297095,
+    "max_drawdown": 0.0029253455792990213,
+    "annual_return": -0.003410515852114493,
+    "best_params": {
+      "lookback": 18,
+      "fib_tolerance": 0.08486319016393931,
+      "roc_period": 20,
+      "stop_loss": 0.010796184858346887
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:03:06.377019"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "volume_price_momentum"
+    ],
+    "strategies_str": "volume_price_momentum",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.1208005083208633,
+    "calmar": -0.0022781090387488673,
+    "max_drawdown": 0.12192683309102877,
+    "annual_return": -0.0002777626205306971,
+    "best_params": {
+      "price_period": 23,
+      "vol_period": 26,
+      "vol_mult": 2.2836454561871755,
+      "atr_period": 13,
+      "atr_stop_mult": 2.7412560023038792,
+      "max_hold": 16
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:03:13.565498"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "price_action_sr"
+    ],
+    "strategies_str": "price_action_sr",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:03:17.612900"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "regime_meta"
+    ],
+    "strategies_str": "regime_meta",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:03:21.661345"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "ml_feature_sr"
+    ],
+    "strategies_str": "ml_feature_sr",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "received 1012 (service restart); then sent 1012 (service restart)",
+    "timestamp": "2026-04-14T16:06:18.936438"
+  },
+  {
+    "engine": "genetic",
+    "strategies": [
+      "rsi_momentum"
+    ],
+    "strategies_str": "rsi_momentum",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "did not receive a valid HTTP response",
+    "timestamp": "2026-04-14T16:06:29.933192"
+  },
+  {
+    "engine": "genetic",
+    "strategies": [
+      "bollinger_squeeze"
+    ],
+    "strategies_str": "bollinger_squeeze",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:06:33.985795"
+  },
+  {
+    "engine": "genetic",
+    "strategies": [
+      "mad_trend"
+    ],
+    "strategies_str": "mad_trend",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:06:38.033582"
+  },
+  {
+    "engine": "genetic",
+    "strategies": [
+      "ema_trend_filter"
+    ],
+    "strategies_str": "ema_trend_filter",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:06:42.086807"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "mev_capture"
+    ],
+    "strategies_str": "mev_capture",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:06:47.092825"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "nlp_event_driven"
+    ],
+    "strategies_str": "nlp_event_driven",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:06:51.133561"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "liquidation_hunting"
+    ],
+    "strategies_str": "liquidation_hunting",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:06:55.176600"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "po3_institutional"
+    ],
+    "strategies_str": "po3_institutional",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:06:59.223985"
+  },
+  {
+    "engine": "drl",
+    "strategies": [
+      "rsi_momentum",
+      "bollinger_squeeze",
+      "donchian_breakout",
+      "ema_trend_filter",
+      "mad_trend",
+      "fibonacci_resonance",
+      "volume_price_momentum",
+      "liquidation_hunting",
+      "price_action_sr",
+      "regime_meta"
+    ],
+    "strategies_str": "rsi_momentum+bollinger_squeeze+donchian_breakout+ema_trend_filter+mad_trend+fibonacci_resonance+volume_price_momentum+liquidation_hunting+price_action_sr+regime_meta",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:07:03.274970"
+  },
+  {
+    "engine": "ensemble",
+    "strategies": [
+      "rsi_momentum",
+      "bollinger_squeeze",
+      "donchian_breakout",
+      "ema_trend_filter",
+      "mad_trend",
+      "fibonacci_resonance",
+      "volume_price_momentum",
+      "liquidation_hunting",
+      "price_action_sr",
+      "regime_meta"
+    ],
+    "strategies_str": "rsi_momentum+bollinger_squeeze+donchian_breakout+ema_trend_filter+mad_trend+fibonacci_resonance+volume_price_momentum+liquidation_hunting+price_action_sr+regime_meta",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:07:07.324780"
+  },
+  {
+    "engine": "bandit",
+    "strategies": [
+      "rsi_momentum",
+      "bollinger_squeeze",
+      "donchian_breakout",
+      "ema_trend_filter",
+      "mad_trend",
+      "fibonacci_resonance",
+      "volume_price_momentum",
+      "liquidation_hunting",
+      "price_action_sr",
+      "regime_meta"
+    ],
+    "strategies_str": "rsi_momentum+bollinger_squeeze+donchian_breakout+ema_trend_filter+mad_trend+fibonacci_resonance+volume_price_momentum+liquidation_hunting+price_action_sr+regime_meta",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:07:11.375252"
+  },
+  {
+    "engine": "risk_parity",
+    "strategies": [
+      "rsi_momentum",
+      "bollinger_squeeze",
+      "donchian_breakout",
+      "ema_trend_filter",
+      "mad_trend",
+      "fibonacci_resonance",
+      "volume_price_momentum",
+      "liquidation_hunting",
+      "price_action_sr",
+      "regime_meta"
+    ],
+    "strategies_str": "rsi_momentum+bollinger_squeeze+donchian_breakout+ema_trend_filter+mad_trend+fibonacci_resonance+volume_price_momentum+liquidation_hunting+price_action_sr+regime_meta",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": null,
+    "calmar": null,
+    "max_drawdown": null,
+    "annual_return": null,
+    "best_params": {},
+    "error": "[WinError 1225] 远程计算机拒绝网络连接。",
+    "timestamp": "2026-04-14T16:07:15.425755"
+  },
+  {
+    "engine": "volatility",
+    "strategies": [
+      "rsi_momentum",
+      "bollinger_squeeze",
+      "donchian_breakout",
+      "ema_trend_filter",
+      "mad_trend",
+      "fibonacci_resonance",
+      "volume_price_momentum",
+      "liquidation_hunting",
+      "price_action_sr",
+      "regime_meta"
+    ],
+    "strategies_str": "rsi_momentum+bollinger_squeeze+donchian_breakout+ema_trend_filter+mad_trend+fibonacci_resonance+volume_price_momentum+liquidation_hunting+price_action_sr+regime_meta",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.5947737466234395,
+    "calmar": 0.7208063001284161,
+    "max_drawdown": 0.07407719147178933,
+    "annual_return": 0.05339530630868472,
+    "best_params": {
+      "w_low_RSI Momentum": 0.1,
+      "w_low_Bollinger Band Squeeze": 0.1,
+      "w_low_Donchian Channel Breakout": 0.1,
+      "w_low_KAMA Crossover + ATR Stop": 0.1,
+      "w_low_MAD Trend": 0.1,
+      "w_low_Fibonacci Resonance": 0.1,
+      "w_low_Volume-Price Momentum": 0.1,
+      "w_low_Liquidation Hunting": 0.1,
+      "w_low_Price Action S/R": 0.1,
+      "w_low_Regime Meta": 0.1,
+      "w_high_RSI Momentum": 0.1115,
+      "w_high_Bollinger Band Squeeze": 0.1171,
+      "w_high_Donchian Channel Breakout": 0.0155,
+      "w_high_KAMA Crossover + ATR Stop": 0.0269,
+      "w_high_MAD Trend": 0.0189,
+      "w_high_Fibonacci Resonance": 0.2862,
+      "w_high_Volume-Price Momentum": 0.1521,
+      "w_high_Liquidation Hunting": 0.1863,
+      "w_high_Price Action S/R": 0.0147,
+      "w_high_Regime Meta": 0.0708
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:07:19.440611"
+  },
+  {
+    "engine": "montecarlo",
+    "strategies": [
+      "rsi_momentum"
+    ],
+    "strategies_str": "rsi_momentum",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.2854883641565082,
+    "calmar": 0.21984646123834303,
+    "max_drawdown": 0.16566052291820751,
+    "annual_return": 0.036419879730461346,
+    "best_params": {
+      "sharpe_p5": -0.0417,
+      "sharpe_median": 0.4061,
+      "sharpe_std": 0.3395,
+      "mc_trials": 50,
+      "RSI Momentum.rsi_period": 8,
+      "RSI Momentum.lookback": 5,
+      "RSI Momentum.oversold": 33.452113657652774,
+      "RSI Momentum.overbought": 60.07086967343137,
+      "RSI Momentum.trend_ma": 189
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:07:29.710169"
+  },
+  {
+    "engine": "montecarlo",
+    "strategies": [
+      "bollinger_squeeze"
+    ],
+    "strategies_str": "bollinger_squeeze",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.0,
+    "calmar": -Infinity,
+    "max_drawdown": 0.0,
+    "annual_return": 0.0,
+    "best_params": {
+      "sharpe_p5": -0.0659,
+      "sharpe_median": 0.0,
+      "sharpe_std": 0.3385,
+      "mc_trials": 50,
+      "Bollinger Band Squeeze.bb_period": 28,
+      "Bollinger Band Squeeze.bb_std": 1.8760744015846673,
+      "Bollinger Band Squeeze.kc_period": 27,
+      "Bollinger Band Squeeze.kc_mult": 1.3595216836534156,
+      "Bollinger Band Squeeze.hold_bars": 18
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:07:41.248801"
+  },
+  {
+    "engine": "montecarlo",
+    "strategies": [
+      "mad_trend"
+    ],
+    "strategies_str": "mad_trend",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 2.7214463140284546,
+    "calmar": 18.47394483803501,
+    "max_drawdown": 0.2312603635081651,
+    "annual_return": 4.272291198673766,
+    "best_params": {
+      "sharpe_p5": -0.1472,
+      "sharpe_median": 0.1075,
+      "sharpe_std": 0.167,
+      "mc_trials": 50,
+      "MAD Trend.window": 36,
+      "MAD Trend.multiplier": 2.4091821844227286,
+      "MAD Trend.vol_window": 20,
+      "MAD Trend.vol_threshold": 0.8286045665732271
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:07:47.095326"
+  }
+]

@@ -301,7 +301,7 @@ class GeneticEngine(BaseEngine):
                 logger.warning(f"Strategy {strategy.name} evaluation failed: {e}")
                 fold_calmars.append(-10.0)
 
-        result = float(np.mean(fold_calmars)) if fold_calmars else float("-inf")
+        result = float(np.mean(fold_calmars)) if fold_calmars else -10.0
         if fitness_cache is not None:
             fitness_cache[chromosome.tobytes()] = result
         return result

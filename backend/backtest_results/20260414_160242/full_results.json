@@ -1,0 +1,46 @@
+[
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "rsi_momentum"
+    ],
+    "strategies_str": "rsi_momentum",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.6687138590876236,
+    "calmar": 1.1695904265744714,
+    "max_drawdown": 0.15110857240112893,
+    "annual_return": 0.1767351396536958,
+    "best_params": {
+      "rsi_period": 10,
+      "lookback": 13,
+      "oversold": 32.154159586565825,
+      "overbought": 65.39466112536516,
+      "trend_ma": 59
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:02:29.147957"
+  },
+  {
+    "engine": "bayesian",
+    "strategies": [
+      "bollinger_squeeze"
+    ],
+    "strategies_str": "bollinger_squeeze",
+    "timeframe": "1d",
+    "worker": 0,
+    "sharpe": 0.26889892444748636,
+    "calmar": 0.19694950081970866,
+    "max_drawdown": 0.18811939023886187,
+    "annual_return": 0.03705002000205182,
+    "best_params": {
+      "bb_period": 24,
+      "bb_std": 1.600441620806679,
+      "kc_period": 24,
+      "kc_mult": 1.7649808587228182,
+      "hold_bars": 16
+    },
+    "error": "",
+    "timestamp": "2026-04-14T16:02:40.870878"
+  }
+]

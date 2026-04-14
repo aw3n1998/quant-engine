@@ -43,15 +43,16 @@ def _get_bars_per_year(timeframe: str) -> int:
 
 def annual_return(returns: pd.Series, timeframe: str = "1d") -> float:
     """
-    计算年化收益率 (复利)
-    annual_return = total_return ^ (bars_per_year / n) - 1
+    计算年化收益率
+    改用简单年化 (Simple Annualization) 以避免高频数据下的复利爆炸。
+    公式: 总收益 * (每年 K 线数 / 样本总 K 线数)
     """
-    total = (1 + returns).prod()
+    total_return = (1 + returns).prod() - 1
     n = len(returns)
-    if n == 0 or total <= 0:
+    if n == 0:
         return 0.0
     bpy = _get_bars_per_year(timeframe)
-    return float(total ** (bpy / n) - 1)
+    return float(total_return * (bpy / n))
 
 
 def max_drawdown(returns: pd.Series) -> float:
@@ -91,7 +92,7 @@ def calmar_ratio(returns: pd.Series, timeframe: str = "1d") -> float:
     """
     # 无交易信号检测
     if returns.abs().sum() < 1e-10:
-        return float('-inf')
+        return -10.0
 
     ar = annual_return(returns, timeframe=timeframe)
     mdd = max_drawdown(returns)

@@ -37,7 +37,7 @@ async def _get_or_create_data(rows: int | None = None, timeframe: str = "1d") ->
     async with _data_lock:
         if "current" not in _data_store:
             n = rows or config.default_data_rows
-            _data_store["current"] = generate_synthetic_data(n, seed=config.default_seed)
+            _data_store["current"] = generate_synthetic_data(n, seed=config.default_seed, timeframe=timeframe)
             _data_store["source"] = "synthetic"
             _data_store["timeframe"] = timeframe
         return _data_store["current"]
@@ -305,7 +305,7 @@ async def run_engine(req: RunEngineRequest) -> dict[str, str]:
         async with _data_lock:
             if "current" not in _data_store:
                 _data_store["current"] = generate_synthetic_data(
-                    req.data_rows, seed=config.default_seed
+                    req.data_rows, seed=config.default_seed, timeframe=req.timeframe
                 )
                 _data_store["source"] = "synthetic"
                 _data_store["timeframe"] = req.timeframe
@@ -800,16 +800,43 @@ async def _run_batch(req: BatchRunRequest, batch_id: str) -> None:
 
     try:
         for timeframe in req.timeframes:
+            current_source = ""
             async with _data_lock:
-                if _data_store.get("source") != "synthetic" and _data_store.get("timeframe") == timeframe:
+                current_source = _data_store.get("source", "synthetic")
+            
+            # --- 智能数据加载逻辑 ---
+            df = None
+            data_source = "unknown"
+            
+            async with _data_lock:
+                # 场景 A: 已加载的数据正好匹配当前循环的 timeframe
+                if current_source != "synthetic" and _data_store.get("timeframe") == timeframe:
                     df = _data_store["current"]
-                    data_source = _data_store.get("source", "unknown")
-                else:
-                    df = generate_synthetic_data(req.data_rows, seed=config.default_seed)
+                    data_source = current_source
+                
+                # 场景 B: 当前处于 Binance 模式，但 timeframe 不匹配 -> 尝试自动拉取真实数据
+                elif current_source.startswith("binance:"):
+                    parts = current_source.split(":")
+                    symbol = parts[1]
+                    await manager.send_log("info", f"[Batch] 检测到 Binance 模式，正在自动拉取 {symbol} {timeframe} 真实数据...")
+                    try:
+                        from app.utils.binance_fetcher import fetch_ohlcv_paginated
+                        df = await fetch_ohlcv_paginated(symbol, timeframe, limit=req.data_rows)
+                        # 更新缓存，避免同一 TF 的多引擎重复拉取
+                        _data_store["current"] = df
+                        _data_store["timeframe"] = timeframe
+                        data_source = f"binance:{symbol}:{timeframe}"
+                    except Exception as e:
+                        await manager.send_log("error", f"[Batch] 自动拉取失败: {e}，降级为合成数据")
+                
+            # 场景 C: 以上都不满足，或者拉取失败 -> 生成对应 TF 的合成数据
+            if df is None:
+                df = generate_synthetic_data(req.data_rows, seed=config.default_seed, timeframe=timeframe)
+                async with _data_lock:
                     _data_store["current"] = df
                     _data_store["source"] = "synthetic"
                     _data_store["timeframe"] = timeframe
-                    data_source = "synthetic"
+                data_source = "synthetic"
 
             params = {
                 "target_roi":      req.target_roi,
@@ -850,10 +877,11 @@ async def _run_batch(req: BatchRunRequest, batch_id: str) -> None:
                             result_dict = _build_result_dict(engine_id, "portfolio", f"{engine.name} Portfolio", result)
                             await _persist(engine_id, group, data_source, timeframe, result_dict, batch_id)
                             
-                            summary = dict(result_dict)
-                            summary["type"] = "batch_summary"
-                            summary["batch_id"] = batch_id
-                            await manager.broadcast(summary)
+                            await manager.broadcast({
+                                "type": "batch_summary",
+                                "batch_id": batch_id,
+                                "data": result_dict,
+                            })
 
                         else:
                             optimized_signals: dict[str, pd.Series] = {}
@@ -868,10 +896,11 @@ async def _run_batch(req: BatchRunRequest, batch_id: str) -> None:
                                     result_dict = _build_result_dict(engine_id, sid, strategy.name, result)
                                     await _persist(engine_id, [sid], data_source, timeframe, result_dict, batch_id)
                                     
-                                    summary = dict(result_dict)
-                                    summary["type"] = "batch_summary"
-                                    summary["batch_id"] = batch_id
-                                    await manager.broadcast(summary)
+                                    await manager.broadcast({
+                                        "type": "batch_summary",
+                                        "batch_id": batch_id,
+                                        "data": result_dict,
+                                    })
 
                                     oos_split = params.get("oos_split", 20.0) / 100.0
                                     split_idx = int(len(df) * (1 - oos_split))

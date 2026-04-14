@@ -30,7 +30,26 @@ class WebSocketManager:
                 self._active.remove(ws)
 
     async def broadcast(self, data: dict[str, Any]) -> None:
-        payload = json.dumps(data, ensure_ascii=False, default=str)
+        """广播消息，处理 NaN/Inf 避免前端 JSON.parse 崩溃"""
+        try:
+            # 尝试标准序列化（不允许非标准 NaN/Inf 文本）
+            payload = json.dumps(data, ensure_ascii=False, allow_nan=False, default=str)
+        except ValueError:
+            # 发现非标准数值，进行清洗
+            import numpy as np
+
+            def clean(obj):
+                if isinstance(obj, dict):
+                    return {k: clean(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [clean(x) for x in obj]
+                elif isinstance(obj, float):
+                    if not np.isfinite(obj):
+                        return 0.0  # 替换为 0.0，避免 JS 报错
+                return obj
+
+            payload = json.dumps(clean(data), ensure_ascii=False, default=str)
+
         async with self._lock:
             stale: list[WebSocket] = []
             for ws in self._active:
@@ -39,7 +58,8 @@ class WebSocketManager:
                 except Exception:
                     stale.append(ws)
             for ws in stale:
-                self._active.remove(ws)
+                if ws in self._active:
+                    self._active.remove(ws)
 
     async def send_progress(
         self, engine: str, strategy: str, progress: float, message: str

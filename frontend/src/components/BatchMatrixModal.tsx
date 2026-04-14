@@ -15,7 +15,11 @@ const ENGINE_OPTIONS = [
   { id: "bayesian", label: "Bayesian" },
   { id: "genetic", label: "Genetic" },
   { id: "montecarlo", label: "Monte Carlo" },
-  { id: "drl", label: "DRL" }
+  { id: "drl", label: "DRL" },
+  { id: "bandit", label: "Bandit" },
+  { id: "volatility", label: "Volatility" },
+  { id: "ensemble", label: "Ensemble" },
+  { id: "risk_parity", label: "Risk Parity" }
 ];
 
 const TIMEFRAMES = ["1d", "4h", "1h", "15m"];
@@ -50,7 +54,7 @@ export default function BatchMatrixModal({ onClose, baseParams, batchProgress, b
 
   const handleStart = async () => {
     if (selectedEngines.length === 0 || selectedTimeframes.length === 0) return;
-    
+
     setRunning(true);
     try {
       const groupConfig = STRATEGY_GROUPS.find(g => g.id === selectedGroup);
@@ -86,7 +90,7 @@ export default function BatchMatrixModal({ onClose, baseParams, batchProgress, b
             [BATCH RUNNER MATRIX]
           </span>
           <button onClick={onClose} className="text-caption text-text-muted hover:text-accent-magenta transition-colors">
-            [✕ CLOSE]
+            [CLOSE]
           </button>
         </div>
 
@@ -141,8 +145,8 @@ export default function BatchMatrixModal({ onClose, baseParams, batchProgress, b
           </div>
 
           <div className="flex-1 flex flex-col min-h-[300px] border border-border-base bg-bg-primary">
-            <div className="flex items-center justify-between p-2 border-b border-border-base bg-bg-secondary">
-              <span className="text-caption uppercase text-accent-cyan tracking-widest">Live Results</span>
+            <div className="flex items-center justify-between p-2 border-b border-border-base bg-bg-secondary"> 
+              <span className="text-caption uppercase text-accent-cyan tracking-widest">Live Results</span>     
               <span className="text-caption text-text-muted">Count: {batchResults.length}</span>
             </div>
             <div className="flex-1 overflow-auto p-2">

@@ -1,0 +1,30 @@
+{
+  "completed": [
+    "bayesian|rsi_momentum"
+  ],
+  "results": [
+    {
+      "engine": "bayesian",
+      "strategies": [
+        "rsi_momentum"
+      ],
+      "strategies_str": "rsi_momentum",
+      "timeframe": "1h",
+      "worker": 0,
+      "sharpe": -4.375576784085124,
+      "calmar": -3.8816352521443975,
+      "max_drawdown": 0.14230482859215768,
+      "annual_return": -0.5523754392136853,
+      "best_params": {
+        "rsi_period": 14,
+        "lookback": 13,
+        "oversold": 30.516964427537175,
+        "overbought": 60.20719207310462,
+        "trend_ma": 66
+      },
+      "error": "",
+      "timestamp": "2026-04-14T17:14:55.368441"
+    }
+  ],
+  "timestamp": "2026-04-14T17:14:55.368931"
+}

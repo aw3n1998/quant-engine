@@ -152,7 +152,7 @@ class BayesianEngine(BaseEngine):
 
         emit(f"[{self.name}] 策略: {strategy.name} | {n_trials} trials × {len(splits)} WFV folds (MOTPE Multi-Objective)")
 
-        sampler = optuna.samplers.MOTPESampler(seed=config.default_seed)
+        sampler = optuna.samplers.TPESampler(seed=config.default_seed)
         study = optuna.create_study(directions=["maximize", "maximize"], sampler=sampler)
         study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
 
@@ -200,12 +200,12 @@ class BayesianEngine(BaseEngine):
         # ----------------------------------------------------------------
         # 提取 Optuna 历史数据（供前端散点收敛图使用，赛博朋克配色）
         # ----------------------------------------------------------------
-        completed = [t for t in study.trials if t.value is not None]
+        completed = [t for t in study.trials if t.values is not None]
         history_data = {
             "data": [
                 {
                     "x": [t.number for t in completed],
-                    "y": [t.value for t in completed],
+                    "y": [t.values[0] for t in completed],
                     "type": "scatter",
                     "mode": "markers",
                     "name": "Trial Score",
@@ -213,7 +213,7 @@ class BayesianEngine(BaseEngine):
                 },
                 {
                     "x": [t.number for t in completed],
-                    "y": _running_best([t.value for t in completed]),
+                    "y": _running_best([t.values[0] for t in completed]),
                     "type": "scatter",
                     "mode": "lines",
                     "name": "Best So Far",
@@ -233,8 +233,10 @@ class BayesianEngine(BaseEngine):
         # 参数重要性（赛博朋克配色）
         importance_data = None
         try:
-            if len(completed) >= 10:
-                importance = optuna.importance.get_param_importances(study)
+            scores = [t.values[0] for t in completed]
+            # 只有当完成的试验足够多，且结果存在波动（方差不为0）时才计算重要性
+            if len(completed) >= 10 and np.var(scores) > 1e-9:
+                importance = optuna.importance.get_param_importances(study, target=lambda t: t.values[0])
                 importance_data = {
                     "data": [{
                         "x": list(importance.values()),
@@ -257,7 +259,7 @@ class BayesianEngine(BaseEngine):
                     },
                 }
         except Exception as e:
-            logger.warning(f"参数重要性计算失败: {e}")
+            logger.warning(f"参数重要性计算跳过: {e}")
 
         extra_plots = {"history": history_data}
         if importance_data:
