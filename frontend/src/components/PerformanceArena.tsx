@@ -54,7 +54,7 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
 
   const safeIdx = Math.min(resultIdx, results.length - 1);
   const result = results[safeIdx];
-  const { engine, strategy_name, best_params, sharpe, calmar, max_drawdown, annual_return, equity_curve, extra_plots, weight_history, strategy_names } = result;
+  const { engine, strategy_name, best_params, sharpe, calmar, max_drawdown, annual_return, alpha, beta, equity_curve, extra_plots, weight_history, strategy_names } = result;
 
   const engineLc = engine.toLowerCase();
   const isDRL = engineLc.includes('drl') || engineLc.includes('deep') || engineLc.includes('reinforcement');
@@ -106,12 +106,14 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
       </div>
 
       {/* 核心指标卡 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {[
           { label: 'Annual Return', value: `${(annual_return * 100).toFixed(2)}%`, positive: annual_return >= 0, rating: <MetricRating metric="annual" value={annual_return} /> },
           { label: 'Calmar Ratio',  value: calmar.toFixed(3),                      positive: calmar >= 1,        rating: <MetricRating metric="calmar" value={calmar} /> },
           { label: 'Max Drawdown', value: `${(max_drawdown * 100).toFixed(2)}%`,   positive: false,              rating: <MetricRating metric="maxdd"  value={max_drawdown} /> },
           { label: 'Sharpe Ratio', value: sharpe.toFixed(3),                       positive: sharpe >= 1,        rating: <MetricRating metric="sharpe" value={sharpe} /> },
+          { label: 'Alpha',        value: `${((alpha || 0) * 100).toFixed(2)}%`,   positive: (alpha || 0) >= 0,  rating: <MetricRating metric="sharpe" value={(alpha || 0) * 10} /> }, // Proxy rating
+          { label: 'Beta',         value: (beta || 0).toFixed(3),                  positive: (beta || 0) <= 1,   rating: <MetricRating metric="maxdd"  value={(beta || 0) - 1} /> },   // Proxy rating
         ].map(m => (
           <div key={m.label} className="border border-border-dim p-4 bg-bg-secondary text-center">
             <div className="text-caption text-text-muted mb-1 uppercase tracking-wider">{m.label}</div>

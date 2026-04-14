@@ -89,6 +89,13 @@ export async function deleteHistoryRun(run_id: string): Promise<{ status: string
   return request<{ status: string }>(`/history/${run_id}`, { method: "DELETE" });
 }
 
+export async function runBatchBacktest(payload: import("../types").BatchRunRequest): Promise<{ status: string; batch_id: string }> {
+  return request<{ status: string; batch_id: string }>("/batch-run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function combineEngines(payload: {
   run_ids: string[];
   weights?: number[];

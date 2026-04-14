@@ -17,7 +17,9 @@ const MAIN_TABS = [
 export default function Dashboard() {
   const {
     connected, logs, results, progressPlots,
-    runStatus, factorWeights, degradationWarnings, clearLogs, clearResults,
+    runStatus, factorWeights, degradationWarnings, 
+    batchProgress, batchResults,
+    clearLogs, clearResults,
   } = useWebSocket();
 
   const [sidebarOpen, setSidebarOpen]       = useState(true);
@@ -84,7 +86,12 @@ export default function Dashboard() {
           <h2 className="text-heading uppercase tracking-widest border-b border-border-base pb-2">
             TERMINAL CONSOLE
           </h2>
-          <ControlPanel connected={connected} runStatus={runStatus} />
+          <ControlPanel 
+            connected={connected} 
+            runStatus={runStatus}
+            batchProgress={batchProgress}
+            batchResults={batchResults}
+          />
         </aside>
 
         {/* Main area */}

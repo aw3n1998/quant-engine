@@ -24,6 +24,7 @@ import pandas as pd
 from app.core.base_strategy import BaseStrategy
 from app.core.strategy_registry import STRATEGY_REGISTRY
 from app.utils.friction import apply_friction_costs
+from app.utils.numba_indicators import fast_ema, get_fast_rsi
 
 
 def _kama(series: pd.Series, n: int = 10, fast_n: int = 2, slow_n: int = 30) -> pd.Series:
@@ -46,8 +47,8 @@ def _kama(series: pd.Series, n: int = 10, fast_n: int = 2, slow_n: int = 30) -> 
     # 为简单起见，使用 pandas 的自适应 ewm（通过 alpha 参数动态调整）
     # pandas ewm 不支持时变 alpha，所以用循环。由于 O(N) 循环在 Python 中较慢，
     # 我们用一个近似的高效向量化方法：使用多周期 EMA 依据 ER 动态加权
-    ema_fast = series.ewm(span=fast_n, adjust=False).mean()
-    ema_slow = series.ewm(span=slow_n, adjust=False).mean()
+    ema_fast = pd.Series(fast_ema(series.values, fast_n), index=series.index)
+    ema_slow = pd.Series(fast_ema(series.values, slow_n), index=series.index)
     return ema_fast * er.fillna(0.5) + ema_slow * (1 - er.fillna(0.5))
 
 

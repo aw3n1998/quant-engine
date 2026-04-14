@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { fetchHistory, fetchHistoryRun, deleteHistoryRun, validateParams, combineEngines } from '../services/api';
 import type { RunHistoryItem, EngineResultData } from '../types';
@@ -8,10 +8,15 @@ interface Props {
   onCompare?: (results: EngineResultData[]) => void;
 }
 
+type HistoryRow =
+  | { type: 'single'; data: RunHistoryItem }
+  | { type: 'batch'; batch_id: string; runs: RunHistoryItem[] };
+
 export default function HistoryPanel({ refreshKey = 0, onCompare }: Props) {
   const [history, setHistory]         = useState<RunHistoryItem[]>([]);
   const [expanded, setExpanded]       = useState<string | null>(null);
   const [expandedData, setExpandedData] = useState<Record<string, unknown> | null>(null);
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
   const [loading, setLoading]         = useState(false);
 
   // 多选状态
@@ -21,14 +26,48 @@ export default function HistoryPanel({ refreshKey = 0, onCompare }: Props) {
   const [showFusePanel, setShowFusePanel] = useState(false);
   const [fuseLabel, setFuseLabel]     = useState('Engine Fusion');
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const load = async () => {
     try {
-      const data = await fetchHistory(30);
+      const data = await fetchHistory(100);
       setHistory(data);
+      setCurrentPage(1);
     } catch { /* silently ignore */ }
   };
 
   useEffect(() => { load(); }, [refreshKey]);
+
+  // Compute grouped history
+  const groupedHistory = useMemo<HistoryRow[]>(() => {
+    const groups: Record<string, RunHistoryItem[]> = {};
+    const rows: HistoryRow[] = [];
+
+    for (const item of history) {
+      if (item.batch_id) {
+        if (!groups[item.batch_id]) {
+          groups[item.batch_id] = [];
+          rows.push({ type: 'batch', batch_id: item.batch_id, runs: groups[item.batch_id] });
+        }
+        groups[item.batch_id].push(item);
+      } else {
+        rows.push({ type: 'single', data: item });
+      }
+    }
+
+    return rows.map(row => {
+      // If a batch group somehow only has 1 item, render it as single
+      if (row.type === 'batch' && row.runs.length === 1) {
+        return { type: 'single', data: row.runs[0] };
+      }
+      return row;
+    });
+  }, [history]);
+
+  // 计算当前页数据
+  const totalPages = Math.ceil(groupedHistory.length / itemsPerPage);
+  const currentData = groupedHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // 初始化融合权重（每次选中变化时均匀分配）
   useEffect(() => {
@@ -42,6 +81,15 @@ export default function HistoryPanel({ refreshKey = 0, onCompare }: Props) {
     setSelected(prev => {
       const next = new Set(prev);
       next.has(run_id) ? next.delete(run_id) : next.add(run_id);
+      return next;
+    });
+  };
+
+  const toggleBatch = (batch_id: string) => {
+    setExpandedBatches(prev => {
+      const next = new Set(prev);
+      if (next.has(batch_id)) next.delete(batch_id);
+      else next.add(batch_id);
       return next;
     });
   };
@@ -121,6 +169,87 @@ export default function HistoryPanel({ refreshKey = 0, onCompare }: Props) {
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+
+  const renderRunRow = (row: RunHistoryItem, isChild = false) => (
+    <React.Fragment key={row.run_id}>
+      <tr
+        className={`border-b border-[#008F11]/10 cursor-pointer transition-colors ${
+          selected.has(row.run_id)
+            ? 'bg-[#00FFFF]/5 border-[#00FFFF]/20'
+            : 'hover:bg-[#008F11]/10'
+        }`}
+        onClick={() => handleExpand(row.run_id)}
+      >
+        <td className={`py-1 pr-2 ${isChild ? 'pl-4' : ''}`}>
+          <input
+            type="checkbox"
+            className="accent-[#00FFFF]"
+            checked={selected.has(row.run_id)}
+            onClick={e => toggleSelect(row.run_id, e)}
+            onChange={() => {}}
+          />
+        </td>
+        <td className="py-1 pr-4 text-[#008F11]">
+          {new Date(row.timestamp).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+        </td>
+        <td className="py-1 pr-4 text-[#00FFFF]">
+          {isChild && <span className="text-[#008F11] mr-1 opacity-70">└─</span>}
+          {row.engine}
+        </td>
+        <td className="py-1 pr-4 text-[#008F11] max-w-[120px] truncate">{row.data_source}</td>
+        <td className={`py-1 pr-4 text-right font-bold ${row.calmar > 0 ? 'text-[#00FF41]' : 'text-[#C724FF]'}`}>
+          {row.calmar?.toFixed(2) ?? '-'}
+        </td>
+        <td className={`py-1 pr-4 text-right ${(row.annual_return ?? 0) > 0 ? 'text-[#00FF41]' : 'text-[#C724FF]'}`}>
+          {row.annual_return != null ? `${(row.annual_return * 100).toFixed(1)}%` : '-'}
+        </td>
+        <td className="py-1 pr-4 text-right text-[#00FFFF]">
+          {row.sharpe?.toFixed(2) ?? '-'}
+        </td>
+        <td className="py-1 flex items-center gap-1">
+          {row.engine !== 'drl' && (
+            <button
+              onClick={e => handleValidate(row.run_id, e)}
+              title="用当前已加载数据验证此run的参数（样本外验证）"
+              className="text-[10px] px-1 border border-[#00FFFF]/50 text-[#00FFFF]/70 hover:border-[#00FFFF] hover:text-[#00FFFF] transition-colors"
+            >OOS</button>
+          )}
+          <button
+            onClick={e => handleDelete(row.run_id, e)}
+            className="text-[#C724FF]/50 hover:text-[#C724FF] px-1"
+          >✕</button>
+        </td>
+      </tr>
+
+      {expanded === row.run_id && expandedData && (
+        <tr key={`${row.run_id}-exp`}>
+          <td colSpan={8} className="pb-4 pt-2">
+            {Array.isArray((expandedData as any).equity_curve) && (expandedData as any).equity_curve.length > 0 && (
+              <div className="border border-[#008F11]/30 h-[200px]">
+                <Plot
+                  data={[{
+                    y: (expandedData as any).equity_curve,
+                    type: 'scatter', mode: 'lines', fill: 'tozeroy', name: 'OOS Equity',
+                    line: { color: '#00FF41', width: 1 },
+                    fillcolor: 'rgba(0,255,65,0.08)',
+                  }]}
+                  layout={{
+                    title: `[历史] ${row.engine} | ${row.data_source}`,
+                    paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+                    font: { color: '#00FF41', size: 10 },
+                    margin: { l: 40, r: 10, t: 30, b: 30 },
+                    xaxis: { gridcolor: '#008F11', gridwidth: 0.5 },
+                    yaxis: { gridcolor: '#008F11', gridwidth: 0.5 },
+                  } as any}
+                  useResizeHandler style={{ width: '100%', height: '100%' }}
+                />
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  );
 
   if (history.length === 0) return null;
 
@@ -243,87 +372,57 @@ export default function HistoryPanel({ refreshKey = 0, onCompare }: Props) {
             </tr>
           </thead>
           <tbody>
-            {history.map(row => (
-              <>
-                <tr
-                  key={row.run_id}
-                  className={`border-b border-[#008F11]/10 cursor-pointer transition-colors ${
-                    selected.has(row.run_id)
-                      ? 'bg-[#00FFFF]/5 border-[#00FFFF]/20'
-                      : 'hover:bg-[#008F11]/10'
-                  }`}
-                  onClick={() => handleExpand(row.run_id)}
-                >
-                  <td className="py-1 pr-2">
-                    <input
-                      type="checkbox"
-                      className="accent-[#00FFFF]"
-                      checked={selected.has(row.run_id)}
-                      onClick={e => toggleSelect(row.run_id, e)}
-                      onChange={() => {}}
-                    />
-                  </td>
-                  <td className="py-1 pr-4 text-[#008F11]">
-                    {new Date(row.timestamp).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="py-1 pr-4 text-[#00FFFF]">{row.engine}</td>
-                  <td className="py-1 pr-4 text-[#008F11] max-w-[120px] truncate">{row.data_source}</td>
-                  <td className={`py-1 pr-4 text-right font-bold ${row.calmar > 0 ? 'text-[#00FF41]' : 'text-[#C724FF]'}`}>
-                    {row.calmar?.toFixed(2) ?? '-'}
-                  </td>
-                  <td className={`py-1 pr-4 text-right ${(row.annual_return ?? 0) > 0 ? 'text-[#00FF41]' : 'text-[#C724FF]'}`}>
-                    {row.annual_return != null ? `${(row.annual_return * 100).toFixed(1)}%` : '-'}
-                  </td>
-                  <td className="py-1 pr-4 text-right text-[#00FFFF]">
-                    {row.sharpe?.toFixed(2) ?? '-'}
-                  </td>
-                  <td className="py-1 flex items-center gap-1">
-                    {row.engine !== 'drl' && (
-                      <button
-                        onClick={e => handleValidate(row.run_id, e)}
-                        title="用当前已加载数据验证此run的参数（样本外验证）"
-                        className="text-[10px] px-1 border border-[#00FFFF]/50 text-[#00FFFF]/70 hover:border-[#00FFFF] hover:text-[#00FFFF] transition-colors"
-                      >OOS</button>
-                    )}
-                    <button
-                      onClick={e => handleDelete(row.run_id, e)}
-                      className="text-[#C724FF]/50 hover:text-[#C724FF] px-1"
-                    >✕</button>
-                  </td>
-                </tr>
-
-                {expanded === row.run_id && expandedData && (
-                  <tr key={`${row.run_id}-exp`}>
-                    <td colSpan={8} className="pb-4 pt-2">
-                      {Array.isArray((expandedData as any).equity_curve) && (expandedData as any).equity_curve.length > 0 && (
-                        <div className="border border-[#008F11]/30 h-[200px]">
-                          <Plot
-                            data={[{
-                              y: (expandedData as any).equity_curve,
-                              type: 'scatter', mode: 'lines', fill: 'tozeroy', name: 'OOS Equity',
-                              line: { color: '#00FF41', width: 1 },
-                              fillcolor: 'rgba(0,255,65,0.08)',
-                            }]}
-                            layout={{
-                              title: `[历史] ${row.engine} | ${row.data_source}`,
-                              paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
-                              font: { color: '#00FF41', size: 10 },
-                              margin: { l: 40, r: 10, t: 30, b: 30 },
-                              xaxis: { gridcolor: '#008F11', gridwidth: 0.5 },
-                              yaxis: { gridcolor: '#008F11', gridwidth: 0.5 },
-                            } as any}
-                            useResizeHandler style={{ width: '100%', height: '100%' }}
-                          />
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </>
-            ))}
+            {currentData.map((group, i) => {
+              if (group.type === 'single') {
+                return renderRunRow(group.data, false);
+              } else {
+                const isExpanded = expandedBatches.has(group.batch_id);
+                return (
+                  <React.Fragment key={group.batch_id}>
+                    <tr
+                      className="border-b border-[#C724FF]/30 bg-[#C724FF]/5 cursor-pointer hover:bg-[#C724FF]/10 transition-colors"
+                      onClick={() => toggleBatch(group.batch_id)}
+                    >
+                      <td colSpan={8} className="py-1.5 px-2 text-[#C724FF] font-bold">
+                        <span className="mr-2 inline-block w-3 text-center">
+                          {isExpanded ? '▼' : '▶'}
+                        </span>
+                        Batch Test Group ({group.runs.length} runs)
+                        <span className="ml-4 text-[10px] text-[#C724FF]/70 font-normal">
+                          ID: {group.batch_id.slice(0, 8)}...
+                        </span>
+                      </td>
+                    </tr>
+                    {isExpanded && group.runs.map(run => renderRunRow(run, true))}
+                  </React.Fragment>
+                );
+              }
+            })}
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-3">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            className="text-[#00FFFF] border border-[#00FFFF] px-2 py-0.5 text-xs hover:bg-[#00FFFF]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            &larr; PREV
+          </button>
+          <span className="text-[#008F11] text-xs font-mono">
+            PAGE {currentPage} / {totalPages}
+          </span>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            className="text-[#00FFFF] border border-[#00FFFF] px-2 py-0.5 text-xs hover:bg-[#00FFFF]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            NEXT &rarr;
+          </button>
+        </div>
+      )}
 
       {loading && <div className="text-xs text-[#008F11] mt-2 animate-pulse">Loading...</div>}
     </div>

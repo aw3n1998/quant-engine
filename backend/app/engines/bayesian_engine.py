@@ -194,7 +194,8 @@ class BayesianEngine(BaseEngine):
         # OOS 全量评估（仅在训练时从未接触过的 OOS 区间）
         df_oos = df.iloc[split_idx:]
         final_returns = strategy.generate_signals(df_oos, best_params)
-        metrics = compute_all_metrics(final_returns, timeframe=timeframe)
+        benchmark_returns = df_oos["close"].pct_change()
+        metrics = compute_all_metrics(final_returns, timeframe=timeframe, benchmark_returns=benchmark_returns)
 
         # ----------------------------------------------------------------
         # 提取 Optuna 历史数据（供前端散点收敛图使用，赛博朋克配色）

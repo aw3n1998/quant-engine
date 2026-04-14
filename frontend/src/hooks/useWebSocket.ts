@@ -9,20 +9,40 @@ export function useWebSocket() {
   const [runStatus, setRunStatus] = useState<RunStatus>('idle');
   const [factorWeights, setFactorWeights] = useState<Record<string, number> | null>(null);
   const [degradationWarnings, setDegradationWarnings] = useState<string[]>([]);
+  
+  const [batchProgress, setBatchProgress] = useState<string>('');
+  const [batchResults, setBatchResults] = useState<EngineResultData[]>([]);
+  
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttempts = useRef(0);
 
-  useEffect(() => {
+  const connect = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
     const ws = new WebSocket(`ws://${window.location.host}/ws`);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      if (wsRef.current === ws) setConnected(true);
+      setConnected(true);
+      reconnectAttempts.current = 0; // Reset attempts on successful connection
+      
+      // Start heartbeat
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send('ping');
+        }
+      }, 30000); // 30s heartbeat
     };
 
     ws.onmessage = (event) => {
-      if (wsRef.current !== ws) return;
       try {
         const msg = JSON.parse(event.data);
+
+        // Ignore pong messages from heartbeat
+        if (msg.type === 'pong') return;
 
         if (msg.type === 'log' || msg.type === 'info' || msg.type === 'error') {
           const logEntry: LogMessage = {
@@ -41,7 +61,6 @@ export function useWebSocket() {
           setProgressPlots(prev => [...prev.slice(-500), msg.data]);
 
         } else if (msg.type === 'run_status') {
-          // 显式状态消息（替代脆弱的字符串匹配）
           setRunStatus(msg.status as RunStatus);
           if (msg.status === 'complete' || msg.status === 'error') {
             setTimeout(() => setProgressPlots([]), 1500);
@@ -52,6 +71,10 @@ export function useWebSocket() {
 
         } else if (msg.type === 'degradation_warning') {
           setDegradationWarnings(msg.strategies as string[]);
+        } else if (msg.type === 'batch_progress') {
+          setBatchProgress(`[${msg.progress}] ${msg.message}`);
+        } else if (msg.type === 'batch_summary') {
+          setBatchResults(prev => [...prev, msg.data]);
         }
 
       } catch (err) {
@@ -60,17 +83,39 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
-      if (wsRef.current === ws) {
-        setConnected(false);
-        setRunStatus('error');
+      setConnected(false);
+      if (runStatus === 'running') setRunStatus('error');
+      
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
       }
+
+      // Reconnection logic with exponential backoff (max 5 minutes)
+      const attempts = reconnectAttempts.current;
+      const delay = Math.min(1000 * Math.pow(2, attempts), 300000);
+      reconnectAttempts.current += 1;
+      
+      console.log(`WebSocket disconnected. Reconnecting in ${delay}ms...`);
+      reconnectTimeoutRef.current = setTimeout(connect, delay);
     };
 
-    return () => {
-      if (wsRef.current === ws) wsRef.current = null;
-      ws.close();
+    ws.onerror = (err) => {
+      console.error('WebSocket error:', err);
+      ws.close(); // Trigger onclose for reconnection
     };
-  }, []);
+  }, [runStatus]);
+
+  useEffect(() => {
+    connect();
+    return () => {
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // Prevent reconnect on explicit unmount
+        wsRef.current.close();
+      }
+    };
+  }, [connect]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
   const clearResults = useCallback(() => {
@@ -79,7 +124,13 @@ export function useWebSocket() {
     setFactorWeights(null);
     setRunStatus('idle');
     setDegradationWarnings([]);
+    setBatchProgress('');
+    setBatchResults([]);
   }, []);
 
-  return { connected, logs, results, progressPlots, runStatus, factorWeights, degradationWarnings, clearLogs, clearResults };
+  return { 
+    connected, logs, results, progressPlots, runStatus, factorWeights, degradationWarnings, 
+    batchProgress, batchResults, 
+    clearLogs, clearResults 
+  };
 }

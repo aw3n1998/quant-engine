@@ -21,6 +21,8 @@ export interface EngineResultData {
   calmar: number;
   max_drawdown: number;
   annual_return: number;
+  alpha?: number;
+  beta?: number;
   equity_curve: number[];
   extra_plots?: {
     history?: { data: unknown[]; layout: unknown };
@@ -65,6 +67,22 @@ export interface BinanceFetchRequest {
   use_nlp?: boolean;
   worldnews_api_key?: string;
 }
+export interface BatchRunRequest {
+  engines: string[];
+  strategy_groups: string[][];
+  timeframes: string[];
+  quick_mode: boolean;
+  data_rows: number;
+  oos_split: number;
+  target_roi: number;
+  max_drawdown: number;
+  friction_penalty: number;
+  ppo_timesteps: number;
+  optuna_trials: number;
+  wfv_folds: number;
+  ga_population: number;
+  ga_generations: number;
+}
 
 export type RunStatus = 'idle' | 'running' | 'complete' | 'error';
 
@@ -86,6 +104,7 @@ export interface RunHistoryItem {
   calmar: number;
   max_drawdown: number;
   annual_return: number;
+  batch_id?: string;
 }
 
 export interface ProgressMessage {
@@ -101,4 +120,15 @@ export interface ResultMessage {
   data: EngineResultData;
 }
 
-export type WSMessage = LogMessage | ProgressMessage | ResultMessage;
+export interface BatchProgressMessage {
+  type: 'batch_progress';
+  progress: string;
+  message: string;
+}
+
+export interface BatchSummaryMessage {
+  type: 'batch_summary';
+  data: EngineResultData;
+}
+
+export type WSMessage = LogMessage | ProgressMessage | ResultMessage | BatchProgressMessage | BatchSummaryMessage;

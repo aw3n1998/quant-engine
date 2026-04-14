@@ -107,7 +107,7 @@ class TestDataValidation:
 
         # Invalid non-monotonic
         df_invalid = df_valid.copy()
-        df_invalid["timestamp"] = df_invalid["timestamp"].iloc[[0, 2, 1, 3, 4, 5, 6, 7, 8, 9]]
+        df_invalid["timestamp"] = df_invalid["timestamp"].iloc[[0, 2, 1, 3, 4, 5, 6, 7, 8, 9]].values
 
         assert not df_invalid["timestamp"].is_monotonic_increasing, "Should detect non-monotonic timestamps"
 

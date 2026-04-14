@@ -116,15 +116,27 @@ def safe_mean(values: list[float]) -> float:
     return float(np.mean(finite)) if finite else -10.0
 
 
-def compute_all_metrics(returns: pd.Series, timeframe: str = "1d") -> dict:
+def compute_all_metrics(returns: pd.Series, timeframe: str = "1d", benchmark_returns: pd.Series | None = None) -> dict:
     """
     一次性计算所有核心绩效指标
     支持 timeframe 参数以正确年化
+    包含 alpha 和 beta 如果提供了 benchmark_returns
     """
-    return {
+    metrics = {
         "sharpe":        sharpe_ratio(returns, timeframe=timeframe),
         "calmar":        calmar_ratio(returns, timeframe=timeframe),
         "max_drawdown":  max_drawdown(returns),
         "annual_return": annual_return(returns, timeframe=timeframe),
         "equity_curve":  equity_curve(returns),
     }
+    
+    if benchmark_returns is not None:
+        from app.utils.attribution import calculate_alpha_beta
+        ab = calculate_alpha_beta(returns, benchmark_returns)
+        metrics["alpha"] = ab["alpha"]
+        metrics["beta"] = ab["beta"]
+    else:
+        metrics["alpha"] = 0.0
+        metrics["beta"] = 0.0
+        
+    return metrics

@@ -19,6 +19,7 @@ import pandas as pd
 from app.core.base_strategy import BaseStrategy
 from app.core.strategy_registry import STRATEGY_REGISTRY
 from app.utils.friction import apply_friction_costs
+from app.utils.numba_indicators import fast_ema, get_fast_rsi
 
 
 def _atr(df: pd.DataFrame, period: int) -> pd.Series:
@@ -73,12 +74,12 @@ class RegimeMetaStrategy(BaseStrategy):
         vol_ratio = atr / close
 
         # 趋势强度：EMA 偏离度
-        ema_fast  = close.ewm(span=ef, adjust=False).mean()
-        ema_slow  = close.ewm(span=es, adjust=False).mean()
+        ema_fast  = pd.Series(fast_ema(close.values, ef), index=close.index)
+        ema_slow  = pd.Series(fast_ema(close.values, es), index=close.index)
         trend_str = ((ema_fast - ema_slow) / close).abs()
         trend_dir = (ema_fast > ema_slow).astype(float) * 2 - 1  # +1上升 -1下降
 
-        rsi = _rsi(close, rsi_p)
+        rsi = get_fast_rsi(close, rsi_p)
 
         position  = pd.Series(0.0, index=df.index)
         daily_ret = close.pct_change()

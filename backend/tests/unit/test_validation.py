@@ -188,9 +188,9 @@ class TestDataQualityDetection:
                 break
         # Allow test to pass if no specific warning but duplicates exist in data
         if not has_duplicate_warning:
-            # Verify data actually has duplicates
-            assert df.index.duplicated().any(), "Test data should have duplicates"
-
+            # Verify data actually has duplicates (either in index or timestamp column)
+            has_dups = df.index.duplicated().any() if "timestamp" not in df.columns else df.duplicated(subset=["timestamp"]).any()
+            assert has_dups, "Test data should have duplicates"
     def test_quality_report_includes_range_info(self, sample_ohlcv_data):
         """Test that quality report includes data range information."""
         df = sample_ohlcv_data

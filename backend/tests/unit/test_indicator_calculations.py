@@ -21,8 +21,8 @@ class TestIndicatorCalculations:
         assert not df["sma"].iloc[window:].isna().any(), "After warmup, no NaN should exist"
 
         # Verify calculation accuracy
-        manual_sma = df["close"].iloc[window - 1 : window + 1].mean()
-        calculated_sma = df["sma"].iloc[window]
+        manual_sma = df["close"].iloc[0 : window].mean()
+        calculated_sma = df["sma"].iloc[window - 1]
         np.testing.assert_almost_equal(manual_sma, calculated_sma)
 
     def test_exponential_moving_average(self, sample_ohlcv_data):
@@ -68,9 +68,9 @@ class TestIndicatorCalculations:
         df["lower_band"] = sma - (std * num_std)
         df["middle_band"] = sma
 
-        # Check relationships
-        assert (df["upper_band"] >= df["middle_band"]).all(), "Upper band should be >= middle"
-        assert (df["lower_band"] <= df["middle_band"]).all(), "Lower band should be <= middle"
+        # Check relationships (ignoring warmup NaNs)
+        assert (df["upper_band"].dropna() >= df["middle_band"].dropna()).all(), "Upper band should be >= middle"
+        assert (df["lower_band"].dropna() <= df["middle_band"].dropna()).all(), "Lower band should be <= middle"
 
     def test_macd_calculation(self, sample_ohlcv_data):
         """Test MACD (Moving Average Convergence Divergence) calculation."""

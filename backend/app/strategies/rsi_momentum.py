@@ -26,6 +26,7 @@ import pandas as pd
 from app.core.base_strategy import BaseStrategy
 from app.core.strategy_registry import STRATEGY_REGISTRY
 from app.utils.friction import apply_friction_costs
+from app.utils.numba_indicators import fast_ema, get_fast_rsi
 
 
 def _rsi(series: pd.Series, period: int) -> pd.Series:
@@ -60,8 +61,8 @@ class RsiMomentumStrategy(BaseStrategy):
         tma    = params["trend_ma"]
 
         close = df["close"]
-        rsi   = _rsi(close, rsi_p)
-        trend = close.ewm(span=tma, adjust=False).mean()
+        rsi   = get_fast_rsi(close, rsi_p)
+        trend = pd.Series(fast_ema(close.values, tma), index=close.index)
 
         # RSI 穿越中轴
         cross_up   = (rsi.shift(1) <= 50) & (rsi > 50)

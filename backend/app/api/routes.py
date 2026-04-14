@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import uuid
 from typing import Any
 
 import pandas as pd
@@ -66,6 +67,23 @@ class RunEngineRequest(BaseModel):
     wfv_folds: int = 5
     ga_population: int = 40        # GA 种群大小
     ga_generations: int = 25       # GA 迭代代数
+
+
+class BatchRunRequest(BaseModel):
+    engines: list[str]
+    strategy_groups: list[list[str]] # e.g. [["rsi_momentum"], ["bollinger_squeeze"], ["drl_strategy1", "drl_strategy2"]]
+    timeframes: list[str]
+    quick_mode: bool = False
+    data_rows: int = 2000
+    oos_split: float = 20.0
+    target_roi: float = 10.0
+    max_drawdown: float = -15.0
+    friction_penalty: float = 0.0005
+    ppo_timesteps: int = 50000
+    optuna_trials: int = 80
+    wfv_folds: int = 5
+    ga_population: int = 40
+    ga_generations: int = 25
 
 
 class BinanceFetchRequest(BaseModel):
@@ -332,6 +350,22 @@ async def run_engine(req: RunEngineRequest) -> dict[str, str]:
     except Exception as e:
         logger.exception("启动引擎任务失败")
         raise HTTPException(500, str(e))
+
+
+@router.post("/batch-run")
+async def batch_run(req: BatchRunRequest) -> dict[str, str]:
+    for eng in req.engines:
+        if eng not in ENGINE_REGISTRY:
+            raise HTTPException(400, f"未知引擎: {eng}")
+    for group in req.strategy_groups:
+        for sid in group:
+            if sid not in STRATEGY_REGISTRY:
+                raise HTTPException(400, f"未知策略: {sid}")
+
+    batch_id = str(uuid.uuid4())
+    config.quick_mode = req.quick_mode
+    asyncio.create_task(_run_batch(req, batch_id))
+    return {"status": "started", "batch_id": batch_id}
 
 
 # -----------------------------------------------------------------------
@@ -722,6 +756,8 @@ def _build_result_dict(
         "calmar":         result.calmar,
         "max_drawdown":   result.max_drawdown,
         "annual_return":  result.annual_return,
+        "alpha":          getattr(result, "alpha", 0.0),
+        "beta":           getattr(result, "beta", 0.0),
         "equity_curve":   result.equity_curve,
         "extra_plots":    result.extra_plots or {},
         "weight_history": result.weight_history or [],
@@ -735,9 +771,140 @@ async def _persist(
     data_source: str,
     timeframe: str,
     result_dict: dict,
+    batch_id: str | None = None,
 ) -> None:
     try:
         from app.utils.persistence import save_result
-        await save_result(engine_id, strategy_ids, data_source, timeframe, result_dict)
+        await save_result(engine_id, strategy_ids, data_source, timeframe, result_dict, batch_id)
     except Exception as e:
         logger.warning(f"持久化失败（非致命）: {e}")
+
+
+async def _run_batch(req: BatchRunRequest, batch_id: str) -> None:
+    loop = asyncio.get_running_loop()
+
+    def log_cb(level: str, msg: str) -> None:
+        asyncio.run_coroutine_threadsafe(manager.send_log(level, msg), loop)
+
+    def broadcast_cb(data: dict) -> None:
+        asyncio.run_coroutine_threadsafe(manager.broadcast(data), loop)
+
+    total_runs = len(req.timeframes) * len(req.engines) * len(req.strategy_groups)
+    current_run = 0
+
+    await manager.broadcast({
+        "type": "run_status",
+        "status": "running",
+        "engine": "batch",
+    })
+
+    try:
+        for timeframe in req.timeframes:
+            async with _data_lock:
+                if _data_store.get("source") != "synthetic" and _data_store.get("timeframe") == timeframe:
+                    df = _data_store["current"]
+                    data_source = _data_store.get("source", "unknown")
+                else:
+                    df = generate_synthetic_data(req.data_rows, seed=config.default_seed)
+                    _data_store["current"] = df
+                    _data_store["source"] = "synthetic"
+                    _data_store["timeframe"] = timeframe
+                    data_source = "synthetic"
+
+            params = {
+                "target_roi":      req.target_roi,
+                "max_drawdown":    req.max_drawdown,
+                "friction_penalty": req.friction_penalty,
+                "ppo_timesteps":   req.ppo_timesteps,
+                "optuna_trials":   req.optuna_trials,
+                "wfv_folds":       req.wfv_folds,
+                "oos_split":       req.oos_split,
+                "timeframe":       timeframe,
+                "ga_population":   req.ga_population,
+                "ga_generations":  req.ga_generations,
+            }
+
+            for engine_id in req.engines:
+                engine_cls = ENGINE_REGISTRY[engine_id]
+                
+                for group in req.strategy_groups:
+                    current_run += 1
+                    engine = engine_cls()
+                    group_name = ",".join(group)
+                    
+                    await manager.broadcast({
+                        "type": "batch_progress",
+                        "progress": current_run / total_runs,
+                        "message": f"Batch [{current_run}/{total_runs}] TF: {timeframe} | Engine: {engine_id} | Strategies: {group_name}"
+                    })
+
+                    try:
+                        if engine_id in ("drl", "genetic", "bandit", "volatility", "ensemble", "montecarlo", "risk_parity"):
+                            strategies = [STRATEGY_REGISTRY[sid] for sid in group]
+                            result = await asyncio.to_thread(
+                                engine.run, strategies, df,
+                                log_callback=log_cb,
+                                broadcast_fn=broadcast_cb,
+                                **params,
+                            )
+                            result_dict = _build_result_dict(engine_id, "portfolio", f"{engine.name} Portfolio", result)
+                            await _persist(engine_id, group, data_source, timeframe, result_dict, batch_id)
+                            
+                            summary = dict(result_dict)
+                            summary["type"] = "batch_summary"
+                            summary["batch_id"] = batch_id
+                            await manager.broadcast(summary)
+
+                        else:
+                            optimized_signals: dict[str, pd.Series] = {}
+                            for sid in group:
+                                strategy = STRATEGY_REGISTRY[sid]
+                                try:
+                                    result = await asyncio.to_thread(
+                                        engine.run, strategy, df,
+                                        log_callback=log_cb,
+                                        **params,
+                                    )
+                                    result_dict = _build_result_dict(engine_id, sid, strategy.name, result)
+                                    await _persist(engine_id, [sid], data_source, timeframe, result_dict, batch_id)
+                                    
+                                    summary = dict(result_dict)
+                                    summary["type"] = "batch_summary"
+                                    summary["batch_id"] = batch_id
+                                    await manager.broadcast(summary)
+
+                                    oos_split = params.get("oos_split", 20.0) / 100.0
+                                    split_idx = int(len(df) * (1 - oos_split))
+                                    df_oos = df.iloc[split_idx:]
+                                    try:
+                                        sig = strategy.generate_signals(df_oos, result.best_params)
+                                        optimized_signals[sid] = sig
+                                    except Exception:
+                                        pass
+                                except Exception as exc:
+                                    logger.exception(f"Batch sub-run failed: {sid}")
+                                    await manager.send_log("error", f"[{engine.name}] {sid} failed in batch: {exc}")
+
+                            if len(optimized_signals) >= 2:
+                                from app.engines.bayesian_engine import run_factor_weight_optimization
+                                factor_weights = await asyncio.to_thread(
+                                    run_factor_weight_optimization,
+                                    optimized_signals,
+                                    timeframe,
+                                    min(50, params.get("optuna_trials", 50) // 2),
+                                )
+                                await manager.broadcast({
+                                    "type": "factor_weights",
+                                    "data": factor_weights,
+                                })
+
+                    except Exception as e:
+                        logger.exception(f"Batch run failed for {engine_id} with {group_name}")
+                        await manager.send_log("error", f"Batch step failed: {e}")
+
+        await manager.broadcast({"type": "run_status", "status": "complete"})
+
+    except Exception as e:
+        logger.exception("Batch background run failed")
+        await manager.send_log("error", f"Batch failed entirely: {e}")
+        await manager.broadcast({"type": "run_status", "status": "error", "message": str(e)})

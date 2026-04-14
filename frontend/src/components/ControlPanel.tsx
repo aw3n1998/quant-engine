@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
 import { runEngine, uploadData } from "../services/api";
-import type { RunStatus } from "../types";
+import type { RunStatus, EngineResultData } from "../types";
 import BinanceFetcher from "./BinanceFetcher";
 import TerminalSection from "./ui/TerminalSection";
 import GlowButton from "./ui/GlowButton";
 import NeonInput from "./ui/NeonInput";
 import { STRATEGY_META } from "../data/glossary";
+import BatchMatrixModal from "./BatchMatrixModal";
 
 const STRATEGY_OPTIONS = [
   // 保留策略
@@ -39,12 +40,15 @@ type DataSource = "synthetic" | "csv" | "binance";
 interface Props {
   connected: boolean;
   runStatus: RunStatus;
+  batchProgress: string;
+  batchResults: EngineResultData[];
 }
 
-export default function ControlPanel({ connected, runStatus }: Props) {
+export default function ControlPanel({ connected, runStatus, batchProgress, batchResults }: Props) {
   const running = runStatus === 'running';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [dataSource, setDataSource] = useState<DataSource>("synthetic");
   const [dataRows, setDataRows] = useState(2000);
   const [dataInfo, setDataInfo] = useState<string | null>(null);
@@ -128,6 +132,21 @@ export default function ControlPanel({ connected, runStatus }: Props) {
           专家模式
         </label>
       </div>
+
+      <div className="flex">
+        <GlowButton fullWidth size="sm" onClick={() => setBatchModalOpen(true)}>
+          [OPEN BATCH RUNNER MATRIX]
+        </GlowButton>
+      </div>
+
+      {batchModalOpen && (
+        <BatchMatrixModal 
+          onClose={() => setBatchModalOpen(false)}
+          baseParams={buildCommonParams()}
+          batchProgress={batchProgress}
+          batchResults={batchResults}
+        />
+      )}
 
       {/* Data Source */}
       <TerminalSection title="DATA SOURCE" accent="cyan" defaultOpen>

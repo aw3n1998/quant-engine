@@ -35,10 +35,18 @@ from app.api.websocket import router as ws_router
 import app.strategies  # noqa: F401
 import app.engines     # noqa: F401
 
+tags_metadata = [
+    {"name": "System", "description": "Health checks and system status"},
+    {"name": "Market Data", "description": "Operations with CSV upload and Binance OHLCV fetching"},
+    {"name": "Trading Engine", "description": "Launch optimization engines, fetch strategies and config"},
+    {"name": "History & Validation", "description": "Manage OOS validation, history logs, and engine fusion"},
+]
+
 app = FastAPI(
     title="Crypto Quant Terminal",
-    description="Multi-engine extensible quantitative trading terminal",
+    description="Multi-engine extensible quantitative trading terminal with advanced backtesting capabilities.",
     version="2.0.0",
+    openapi_tags=tags_metadata,
     lifespan=lifespan,
 )
 

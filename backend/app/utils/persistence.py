@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS run_history (
     equity_curve   TEXT,                 -- JSON float array
     best_params    TEXT,                 -- JSON object
     weight_history TEXT,                 -- JSON (DRL/GA weight matrix)
-    extra_plots    TEXT                  -- JSON (metadata only, no full chart objects)
+    extra_plots    TEXT,                 -- JSON (metadata only, no full chart objects)
+    batch_id       TEXT                  -- Optional batch ID for grouped runs
 )
 """
 
@@ -43,6 +44,10 @@ async def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_TABLE_SQL)
+        try:
+            await db.execute("ALTER TABLE run_history ADD COLUMN batch_id TEXT")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -52,6 +57,7 @@ async def save_result(
     data_source: str,
     timeframe: str,
     result_dict: dict[str, Any],
+    batch_id: str | None = None,
 ) -> str:
     """持久化一次引擎运行结果，返回 run_id"""
     run_id = str(uuid.uuid4())
@@ -72,8 +78,8 @@ async def save_result(
             INSERT INTO run_history
               (run_id, timestamp, engine, strategies, data_source, timeframe,
                sharpe, calmar, max_drawdown, annual_return,
-               equity_curve, best_params, weight_history, extra_plots)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               equity_curve, best_params, weight_history, extra_plots, batch_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 run_id,
@@ -90,6 +96,7 @@ async def save_result(
                 json.dumps(result_dict.get("best_params", {}), ensure_ascii=False, default=str),
                 json.dumps(result_dict.get("weight_history", []), ensure_ascii=False),
                 json.dumps(extra_meta, ensure_ascii=False),
+                batch_id,
             ),
         )
         await db.commit()
@@ -104,7 +111,7 @@ async def load_history(limit: int = 50) -> list[dict]:
         cursor = await db.execute(
             """
             SELECT run_id, timestamp, engine, strategies, data_source, timeframe,
-                   sharpe, calmar, max_drawdown, annual_return
+                   sharpe, calmar, max_drawdown, annual_return, batch_id
             FROM run_history
             ORDER BY timestamp DESC
             LIMIT ?
@@ -145,6 +152,13 @@ async def load_run(run_id: str) -> dict | None:
 
 async def delete_run(run_id: str) -> bool:
     """删除指定运行记录，返回是否成功"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "DELETE FROM run_history WHERE run_id = ?", (run_id,)
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+是否成功"""
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
             "DELETE FROM run_history WHERE run_id = ?", (run_id,)
