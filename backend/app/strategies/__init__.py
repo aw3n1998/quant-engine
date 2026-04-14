@@ -23,3 +23,4 @@ from app.strategies import volume_price_momentum  # noqa: F401
 from app.strategies import regime_meta            # noqa: F401
 from app.strategies import ml_feature_strategy    # noqa: F401
 from app.strategies import price_action_sr        # noqa: F401
+from app.strategies import hmm_regime_meta        # noqa: F401

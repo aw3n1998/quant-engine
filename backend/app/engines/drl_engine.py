@@ -71,6 +71,35 @@ class DRLEngine(BaseEngine):
 
         from stable_baselines3 import PPO
         from stable_baselines3.common.callbacks import BaseCallback
+        import torch
+        import torch.nn as nn
+        from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+
+        class TransformerFeatureExtractor(BaseFeaturesExtractor):
+            """
+            Phase 6: 自定义 Transformer/Attention 特征提取器
+            使 PPO 策略网络能够识别序列中的注意力权重，捕捉长期趋势记忆。
+            """
+            def __init__(self, observation_space, features_dim: int = 128):
+                super().__init__(observation_space, features_dim)
+                n_input_channels = observation_space.shape[0]
+                
+                # 简化的 Self-Attention 层 (1 Head)
+                self.qkv_proj = nn.Linear(n_input_channels, 3 * 32)
+                self.attn_proj = nn.Linear(32, features_dim)
+                self.relu = nn.ReLU()
+                self.norm = nn.LayerNorm(features_dim)
+
+            def forward(self, observations: torch.Tensor) -> torch.Tensor:
+                qkv = self.qkv_proj(observations)
+                q, k, v = torch.chunk(qkv, 3, dim=-1)
+                
+                scores = torch.matmul(q.unsqueeze(-1), k.unsqueeze(1)) / (32 ** 0.5)
+                attn = torch.softmax(scores, dim=-1)
+                out = torch.matmul(attn, v.unsqueeze(-1)).squeeze(-1)
+                
+                out = self.relu(self.attn_proj(out))
+                return self.norm(out)
 
         set_global_seed(config.default_seed)
 
@@ -154,8 +183,9 @@ class DRLEngine(BaseEngine):
                                 self_.training_env.reset()[0]
                             )[0]
                         ).entropy().mean().item())
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Failed to compute policy entropy: {e}")
+                        entropy = 0.0
                     if self_.bfn:
                         self_.bfn({
                             "type": "progress_plot",
@@ -194,11 +224,15 @@ class DRLEngine(BaseEngine):
                     emit(f"[{self.name}] 载入历史模型热启动: ppo_{strategy_hash}.zip")
                     fold_model = PPO.load(model_path, env=train_env)
                 else:
-                    emit(f"[{self.name}] 初始化 PPO (MLP {list(config.drl_net_arch)}, "
+                    emit(f"[{self.name}] 初始化 PPO (Transformer Attention, "
                          f"ent_coef={config.drl_ent_coef})")
                     fold_model = PPO(
                         "MlpPolicy", train_env,
-                        policy_kwargs=dict(net_arch=list(config.drl_net_arch)),
+                        policy_kwargs=dict(
+                            net_arch=list(config.drl_net_arch),
+                            features_extractor_class=TransformerFeatureExtractor,
+                            features_extractor_kwargs=dict(features_dim=128),
+                        ),
                         learning_rate=config.drl_learning_rate,
                         gamma=config.drl_gamma,
                         ent_coef=config.drl_ent_coef,

@@ -129,9 +129,9 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
       {/* Tab 内容区 */}
       <div className="border border-border-base p-4 bg-bg-secondary" style={{ minHeight: 360 }}>
 
-        {/* EQUITY — OOS 权益曲线 */}
+        {/* EQUITY — OOS 权益曲线与回撤图 */}
         {validTab === 'equity' && (
-          <div>
+          <div className="flex flex-col gap-2">
             {results.length >= 2 && (
               <div className="flex justify-end mb-2">
                 <button
@@ -146,6 +146,8 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
                 </button>
               </div>
             )}
+            
+            {/* 主权益图表 */}
             {equityOverlay && results.length >= 2 ? (
               <Plot
                 data={results.map((r, i) => ({
@@ -165,21 +167,52 @@ export default function PerformanceArena({ results, onClear, progressPlots, runS
                 style={{ width: '100%', height: 340 }}
               />
             ) : equity_curve && equity_curve.length > 0 ? (
-              <Plot
-                data={[{
-                  y: equity_curve,
-                  type: 'scatter', mode: 'lines', fill: 'tozeroy', name: 'OOS Equity',
-                  line: { color: '#00FF41', width: 2 },
-                  fillcolor: 'rgba(0,255,65,0.08)',
-                }]}
-                layout={hackerLayout({
-                  title: { text: 'OOS Equity Curve (Simple Interest)', font: { color: '#00FF41', size: 13 } },
-                  xaxis: { title: 'Bar', gridcolor: '#122012', color: '#00FF41' },
-                  yaxis: { title: 'Cumulative Return', gridcolor: '#122012', color: '#00FF41' },
-                })}
-                useResizeHandler
-                style={{ width: '100%', height: 340 }}
-              />
+              <>
+                <Plot
+                  data={[{
+                    y: equity_curve,
+                    type: 'scatter', mode: 'lines', fill: 'tozeroy', name: 'OOS Equity',
+                    line: { color: '#00FF41', width: 2 },
+                    fillcolor: 'rgba(0,255,65,0.08)',
+                  }]}
+                  layout={hackerLayout({
+                    title: { text: 'OOS Equity Curve (Simple Interest)', font: { color: '#00FF41', size: 13 } },
+                    xaxis: { title: 'Bar', gridcolor: '#122012', color: '#00FF41' },
+                    yaxis: { title: 'Cumulative Return', gridcolor: '#122012', color: '#00FF41' },
+                    margin: { l: 50, r: 20, t: 40, b: 30 },
+                  })}
+                  useResizeHandler
+                  style={{ width: '100%', height: 280 }}
+                />
+                
+                {/* 水下回撤图表 (Underwater Chart) */}
+                {(() => {
+                  let maxSoFar = 0;
+                  const drawdowns = equity_curve.map(val => {
+                    maxSoFar = Math.max(maxSoFar, val);
+                    return val - maxSoFar; // For simple interest return
+                  });
+                  
+                  return (
+                    <Plot
+                      data={[{
+                        y: drawdowns,
+                        type: 'scatter', mode: 'lines', fill: 'tozeroy', name: 'Drawdown',
+                        line: { color: '#FF003C', width: 1 },
+                        fillcolor: 'rgba(255,0,60,0.15)',
+                      }]}
+                      layout={hackerLayout({
+                        title: { text: 'Underwater Chart (Drawdown)', font: { color: '#FF003C', size: 11 } },
+                        xaxis: { title: '', gridcolor: '#122012', color: '#00FF41' },
+                        yaxis: { title: 'Drawdown', gridcolor: '#122012', color: '#FF003C' },
+                        margin: { l: 50, r: 20, t: 25, b: 25 },
+                      })}
+                      useResizeHandler
+                      style={{ width: '100%', height: 120 }}
+                    />
+                  );
+                })()}
+              </>
             ) : (
               <div className="h-[340px] flex items-center justify-center text-text-muted text-caption">NO EQUITY DATA</div>
             )}

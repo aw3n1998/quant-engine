@@ -113,57 +113,72 @@ class BayesianEngine(BaseEngine):
         if not splits:
             splits = [(int(total_is * 0.7), total_is)]
 
-        def objective(trial: optuna.Trial) -> float:
+        def objective(trial: optuna.Trial) -> tuple[float, float]:
             """
-            ┌───────────────────────────────────────────────────────────┐
-            │            万能目标函数 + WFV + 剪枝 设计意图               │
-            │                                                           │
-            │  万能性：动态实例化用户选中的 Target Strategy，               │
-            │    调用其 get_param_space() 和 generate_signals()，         │
-            │    无需为每个策略单独编写目标函数，完全通用。                  │
-            │                                                           │
-            │  Calmar Ratio 优化目标：                                    │
-            │    Calmar = 年化收益 / 最大回撤，同时惩罚低收益和高回撤，      │
-            │    优于纯 Sharpe：对极端回撤惩罚更重，避免"高收益必爆仓"。    │
-            │                                                           │
-            │  MedianPruner 早停：                                       │
-            │    当 trial 前几折的分数中位数低于历史已完成 trial，           │
-            │    立即剪枝（TrialPruned），节省计算资源，                    │
-            │    等效于自适应早停，让 Optuna 集中精力在有潜力的参数区域。    │
-            └───────────────────────────────────────────────────────────┘
+            多目标优化函数：同时最大化 Calmar Ratio 和 Sharpe Ratio。
             """
             params = strategy.get_param_space(trial)
             fold_calmars = []
+            fold_sharpes = []
 
             for fold_idx, (val_start, val_end) in enumerate(splits):
                 val_df = df_is.iloc[val_start:val_end]
                 try:
                     val_returns = strategy.generate_signals(val_df, params)
                     cr = calmar_ratio(val_returns, timeframe=timeframe)
+                    
+                    # Compute sharpe ratio simply here (or import sharpe_ratio if available, using basic approximation)
+                    mean_ret = val_returns.mean()
+                    std_ret = val_returns.std()
+                    from app.utils.metrics import BARS_PER_YEAR
+                    bpy = BARS_PER_YEAR.get(timeframe, 365)
+                    sr = (mean_ret / std_ret * np.sqrt(bpy)) if std_ret > 1e-8 else -10.0
+                    
                     if not np.isfinite(cr):
                         cr = -10.0
-                except Exception:
+                    if not np.isfinite(sr):
+                        sr = -10.0
+                except Exception as e:
+                    logger.exception(f"Strategy {strategy.name} fold {fold_idx} evaluation failed")
                     cr = -10.0
+                    sr = -10.0
 
                 fold_calmars.append(cr)
+                fold_sharpes.append(sr)
 
-                # 向 Optuna 汇报中间值，供 MedianPruner 决策
-                trial.report(float(np.mean(fold_calmars)), fold_idx)
-                if trial.should_prune():
-                    raise optuna.TrialPruned()
+                # 对于多目标优化，不支持 MedianPruner 的简单 report，故移除中途剪枝
 
-            # 各折 Calmar 取平均：自然惩罚高方差策略
-            return float(np.mean(fold_calmars))
+            return float(np.mean(fold_calmars)), float(np.mean(fold_sharpes))
 
-        emit(f"[{self.name}] 策略: {strategy.name} | {n_trials} trials × {len(splits)} WFV folds")
+        emit(f"[{self.name}] 策略: {strategy.name} | {n_trials} trials × {len(splits)} WFV folds (MOTPE Multi-Objective)")
 
-        sampler = optuna.samplers.TPESampler(seed=config.default_seed)
-        pruner = optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=1)
-        study = optuna.create_study(direction="maximize", sampler=sampler, pruner=pruner)
+        sampler = optuna.samplers.MOTPESampler(seed=config.default_seed)
+        study = optuna.create_study(directions=["maximize", "maximize"], sampler=sampler)
         study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
 
-        best_params = study.best_trial.params
-        emit(f"[{self.name}] 最优 Calmar: {study.best_value:.4f} | 参数: {best_params}")
+        # 从帕累托前沿 (Pareto Front) 选出最佳 trial
+        best_trials = study.best_trials
+        if not best_trials:
+            best_trial = study.trials[0]
+        else:
+            # 启发式选择：归一化目标后求到理想点（最大Calmar, 最大Sharpe）距离最小的，或者简单加权
+            calmars = np.array([t.values[0] for t in best_trials])
+            sharpes = np.array([t.values[1] for t in best_trials])
+            
+            # 避免除以 0
+            cal_range = calmars.max() - calmars.min() if calmars.max() > calmars.min() else 1.0
+            shr_range = sharpes.max() - sharpes.min() if sharpes.max() > sharpes.min() else 1.0
+            
+            norm_cal = (calmars - calmars.min()) / cal_range
+            norm_shr = (sharpes - sharpes.min()) / shr_range
+            
+            # 综合得分 (等权)
+            combined_scores = norm_cal + norm_shr
+            best_idx = np.argmax(combined_scores)
+            best_trial = best_trials[best_idx]
+
+        best_params = best_trial.params
+        emit(f"[{self.name}] 帕累托最优选择 -> Calmar: {best_trial.values[0]:.4f}, Sharpe: {best_trial.values[1]:.4f} | 参数: {best_params}")
 
         # OOS 全量评估（仅在训练时从未接触过的 OOS 区间）
         df_oos = df.iloc[split_idx:]

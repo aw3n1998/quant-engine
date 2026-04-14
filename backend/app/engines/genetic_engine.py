@@ -204,8 +204,8 @@ class GeneticEngine(BaseEngine):
 
         try:
             strategy.get_param_space(MockTrial())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to extract parameter space for {strategy.name}: {e}")
         return bounds
 
     @staticmethod
@@ -297,7 +297,8 @@ class GeneticEngine(BaseEngine):
                 sig = strategy.generate_signals(val_df, params)
                 cr = calmar_ratio(sig, timeframe=timeframe)
                 fold_calmars.append(cr if np.isfinite(cr) else -10.0)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Strategy {strategy.name} evaluation failed: {e}")
                 fold_calmars.append(-10.0)
 
         result = float(np.mean(fold_calmars)) if fold_calmars else float("-inf")
